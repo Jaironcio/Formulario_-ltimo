@@ -1,0 +1,271 @@
+/* static/css/dashboard.css */
+
+/* Contenedor principal del dashboard, similar al de reportes */
+.dashboard-container {
+    max-width: 1200px;
+    margin: 50px auto;
+    padding: 40px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-container h1 {
+    text-align: left;
+    margin-top: -10px;
+}
+
+.dashboard-subtitle {
+    font-size: 1.1em;
+    color: #555;
+    margin-top: -35px;
+    margin-bottom: 30px;
+}
+
+/* --- Estilos de la Tabla KPI --- */
+
+.kpi-section {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    overflow: hidden; /* Para que la tabla respete los bordes */
+}
+
+.kpi-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid #eee;
+}
+
+.kpi-header h2 {
+    color: #006666;
+    margin: 0;
+}
+
+.kpi-table-container {
+    width: 100%;
+    overflow-x: auto; /* Para responsividad en móviles */
+}
+
+.dashboard-kpi-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.dashboard-kpi-table th,
+.dashboard-kpi-table td {
+    padding: 15px 20px;
+    text-align: left;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.dashboard-kpi-table th {
+    background-color: #f9f9f9;
+    color: #333;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dashboard-kpi-table td {
+    font-size: 1em;
+    color: #555;
+}
+
+/* Badges de Meta (Cumple / No Cumple) */
+.kpi-badge {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 15px;
+    font-weight: bold;
+    font-size: 0.9em;
+    color: #fff;
+}
+
+.kpi-badge-cumple {
+    background-color: #28a745; /* Verde */
+}
+
+.kpi-badge-no-cumple {
+    background-color: #dc3545; /* Rojo */
+}
+
+/* Estilos de Carga */
+.loading-message {
+    padding: 30px;
+    text-align: center;
+    color: #888;
+    font-style: italic;
+}
+.dashboard-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    border: 1px solid #e0e0e0;
+    align-items: flex-end; /* Alinea los botones con los selects */
+}
+
+.control-group {
+    flex: 1 1 200px; /* Crece, se encoge, base de 200px */
+}
+
+.control-group label {
+    display: block;
+    font-weight: bold;
+    color: #006666;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+}
+
+.control-group select {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #B2DFDB;
+    border-radius: 10px;
+    font-size: 0.95em;
+    background: white;
+    color: #333;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23008B8B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13%205.7L146.2%20202.7%2018.5%2075.1a17.6%2017.6%200%200%200-24.7%2024.7l130.4%20130.4c6.8%206.8%2017.8%206.8%2024.6%200l130.4-130.4a17.6%2017.6%200%200%200-13-30.3z%22%2F%3E%3C%2Fsvg%3E');
+    background-repeat: no-repeat;
+    background-position: right 15px top 50%;
+    background-size: 14px auto;
+    cursor: pointer;
+}
+
+.dashboard-btn {
+    flex-basis: auto; /* El botón solo toma el espacio que necesita */
+    padding: 12px 25px;
+    background: linear-gradient(135deg, #006666, #008B8B);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.95em;
+}
+
+.dashboard-btn:hover {
+    background: linear-gradient(135deg, #008B8B, #006666);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 102, 102, 0.3);
+}
+/* --- Estilos para los Gráficos (FALTANTE) --- */
+
+.charts-grid {
+    display: grid;
+    /* Creamos 2 columnas de igual tamaño */
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.chart-container {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 25px;
+
+    /* --- LA CORRECCIÓN CLAVE --- */
+    position: relative; /* Necesario para Chart.js */
+    height: 400px;      /* Altura fija para evitar que se estire */
+}
+
+.chart-container h2 {
+    color: #006666;
+    margin: 0 0 20px 0;
+    text-align: center;
+    font-size: 1.2em;
+}
+
+/* Responsividad para los gráficos */
+@media (max-width: 900px) {
+    .charts-grid {
+        /* Hacemos 1 sola columna en pantallas más pequeñas */
+        grid-template-columns: 1fr;
+    }
+}
+/* --- Estilos para las Métricas (NUEVO) --- */
+
+.metrics-grid {
+    display: grid;
+    /* 4 columnas */
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.metric-card {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.metric-icon {
+    font-size: 2.5em;
+    margin-right: 20px;
+    padding: 10px;
+    background-color: #f0f8ff;
+    border-radius: 10px;
+}
+
+.metric-content h3 {
+    font-size: 2em;
+    font-weight: bold;
+    color: #006666;
+    margin: 0;
+}
+
+.metric-content p {
+    font-size: 0.9em;
+    color: #555;
+    margin: 0;
+}
+
+/* Responsividad para métricas y gráficos */
+@media (max-width: 1024px) {
+    .metrics-grid {
+        /* 2 columnas en tablet */
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 900px) {
+    .charts-grid {
+        /* 1 columna en móvil */
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .metrics-grid {
+        /* 1 columna en móvil */
+        grid-template-columns: 1fr;
+    }
+}
+/* --- Estilos para Botones de Sidebar (si faltan) --- */
+
+/* (Puede que ya tengas esta clase de 'reporte.html', 
+   pero la añadimos por si acaso) */
+.sidebar-actions .action-primary-green {
+    background: linear-gradient(135deg, #1D976C, #28a745);
+    color: white;
+    font-weight: bold;
+}
+
+.sidebar-actions .action-primary-green:hover {
+    background: linear-gradient(135deg, #198754, #1D976C);
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+}

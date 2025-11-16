@@ -1,0 +1,180 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Incidencias - Cermaq Chile</title>
+    
+    <link rel="stylesheet" href="{% static 'css/formulario.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <link rel="icon" type="image/png" href="{% static 'imagenes/logo-pestaña.png' %}">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+</head>
+<body>
+    <div class="page-layout">
+        <div class="dashboard-container">
+            
+            <h1>📊 Dashboard de Incidencias</h1>
+            <p class="dashboard-subtitle">Métricas de cumplimiento y rendimiento operativo.</p>
+            
+            <section class="dashboard-controls">
+                <div class="control-group">
+                    <label for="dashboardFiltroFecha">Filtrar por período:</label>
+                    <select id="dashboardFiltroFecha">
+                        <option value="all" {% if filtros_aplicados.periodo == 'all' or not filtros_aplicados.periodo %}selected{% endif %}>Todo el tiempo</option>
+                        <option value="week" {% if filtros_aplicados.periodo == 'week' %}selected{% endif %}>Última semana</option>
+                        <option value="month" {% if filtros_aplicados.periodo == 'month' %}selected{% endif %}>Último mes</option>
+                        <option value="quarter" {% if filtros_aplicados.periodo == 'quarter' %}selected{% endif %}>Últimos 3 meses</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="dashboardFiltroCentro">Centro:</label>
+                    <select id="dashboardFiltroCentro">
+                        <option value="">Todos los centros</option>
+                        {% for c in centros %}
+                        <option value="{{ c.id }}" {% if filtros_aplicados.centro == c.id|stringformat:"s" %}selected{% endif %}>
+                            {{ c.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button id="actualizarDashboard" class="dashboard-btn">🔄 Actualizar Dashboard</button>
+            </section>
+            
+            <section class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon">📋</div>
+                    <div class="metric-content">
+                        <h3 id="totalIncidencias">{{ total_incidencias }}</h3>
+                        <p>Total Incidencias</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">🏆</div>
+                    <div class="metric-content">
+                        <h3 id="centroMasIncidencias">{{ centro_mas_incidencias }}</h3>
+                        <p>Centro con Más Incidencias</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">⏱️</div>
+                    <div class="metric-content">
+                        <h3 id="tiempoPromedio">{{ promedio_resolucion }}</h3>
+                        <p>Tiempo Promedio (min)</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">⚠️</div>
+                    <div class="metric-content">
+                        <h3 id="riesgoAlto">{{ alto_riesgo_count }}</h3>
+                        <p>Incidencias de Alto Riesgo</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="charts-grid">
+                <div class="chart-container">
+                    <h2>📊 Incidencias por Centro</h2>
+                    <canvas id="chartIncidenciasCentro"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h2>📈 Tendencia Temporal</h2>
+                    <canvas id="chartTendencia"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h2>🔄 Tipos de Incidencia</h2>
+                    <canvas id="chartTipos"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h2>👥 Operarios que Más Responden</h2>
+                    <canvas id="chartOperarios"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h2>🏷️ Clasificación de Incidencias</h2>
+                    <canvas id="chartClasificacion"></canvas>
+                </div>
+            </section>
+
+            <section class="kpi-section">
+                <div class="kpi-header">
+                    <h2>KPIs de Cumplimiento (Meta: 20 min / 80%)</h2>
+                </div>
+                <div class="kpi-table-container">
+                    <table class="dashboard-kpi-table">
+                        <thead>
+                            <tr>
+                                <th>Centro</th>
+                                <th>Total Incidencias</th>
+                                <th>En KPI (<= 20 min)</th>
+                                <th>% Cumplimiento</th>
+                                <th>Meta (> 80%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in kpi_data %}
+                            <tr>
+                                <td><strong>{{ item.centro_nombre }}</strong></td>
+                                <td>{{ item.total_incidencias }}</td>
+                                <td>{{ item.en_kpi }}</td>
+                                <td><strong>{{ item.porcentaje }}%</strong></td>
+                                <td>
+                                    {% if item.cumple_meta %}
+                                        <span class="kpi-badge kpi-badge-cumple">Cumple</span>
+                                    {% else %}
+                                        <span class="kpi-badge kpi-badge-no-cumple">No Cumple</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="loading-message">No hay datos de KPI para mostrar.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+        </div> 
+
+        <div class="sidebar-actions">
+            <h4>🛠️ Acciones</h4>
+            <div class="action-group">
+                <span>Navegación</span>
+                <button onclick="window.location.href='{% url 'home' %}'">➕ Nuevo Reporte</button>
+                <button onclick="window.location.href='{% url 'reporte' %}'">📄 Ver Reportes</button>
+            </div>
+            <div class="action-group">
+                <span>Exportar</span>
+                <button id="exportDashboardPdfBtn" class="action-primary-green">📄 Descargar PDF</button>
+            </div>
+            <div class="action-group">
+                <span>Dashboards</span>
+                <button onclick="window.location.href='{% url 'dashboard' %}'" disabled>📈 General</button>
+                <button onclick="window.location.href='power-bi.html'" class="power-bi-btn">📊 Power BI</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.CHART_CENTRO_LABELS = {{ chart_centro_labels_json|safe }};
+        window.CHART_CENTRO_DATA = {{ chart_centro_counts_json|safe }};
+        window.CHART_TENDENCIA_LABELS = {{ chart_tendencia_labels_json|safe }};
+        window.CHART_TENDENCIA_DATA = {{ chart_tendencia_data_json|safe }};
+        window.CHART_TIPOS_DATA = {{ chart_tipos_data_json|safe }};
+        window.CHART_OPERARIO_LABELS = {{ chart_operario_labels_json|safe }};
+        window.CHART_OPERARIO_DATA = {{ chart_operario_data_json|safe }};
+        window.CHART_CLASIFICACION_LABELS = {{ chart_clasificacion_labels_json|safe }};
+        window.CHART_CLASIFICACION_DATA = {{ chart_clasificacion_data_json|safe }};
+    </script>
+    
+    <script src="{% static 'js/dashboard.js' %}"></script>
+
+</body>
+</html>

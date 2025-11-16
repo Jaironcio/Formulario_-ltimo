@@ -1,0 +1,188 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Diario de Incidencias - Cermaq Chile</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="{% static 'css/formulario.css' %}">
+    <link rel="icon" type="image/png" href="{% static 'imagenes/logo-pestaña.png' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+
+<body>
+    <div class="page-layout">
+
+        <div class="form-container" id="reporte-container"> 
+            
+            <header class="reporte-header">
+                
+                {% csrf_token %} <div class="header-content">
+                    <img src="{% static 'imagenes/logo-pestaña.png' %}" alt="Logo Cermaq Chile" class="form-logo">
+                    <div class="header-info">
+                        <h1 id="reporteTitulo">📋 Reporte de Incidencias</h1>
+                        <div class="header-meta">
+                            <div class="fecha-info">
+                                <span class="fecha-label">📅 Fecha del Reporte:</span>
+                                <span id="reporteFecha" class="fecha-value">--/--/----</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-stats" id="headerStats">
+                    <div class="stat-item">
+                        <div class="stat-number" id="totalIncidenciasHeader">{{ incidencias|length }}</div>
+                        <div class="stat-label">Total Incidencias</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="incidenciasFiltradasHeader">{{ incidencias|length }}</div>
+                        <div class="stat-label">Incidencias Mostradas</div>
+                    </div>
+                </div>
+            </header>
+
+            <section class="filtros-panel-profesional" id="filtrosReporteSection">
+                <div class="filtros-header">
+                    <h2>🔍 Panel de Filtros Avanzados</h2>
+                </div>
+                
+                <div class="filtros-grid">
+                    <div class="filtro-card">
+                        <div class="filtro-icon">📅</div>
+                        <div class="filtro-content">
+                            <label for="filtroFecha">Fecha Específica</label>
+                            <input type="date" id="filtroFecha" name="filtroFecha" class="filtro-input">
+                        </div>
+                    </div>
+
+                    <div class="filtro-card">
+                        <div class="filtro-icon">⚙️</div>
+                        <div class="filtro-content">
+                            <label for="filtroTipoIncidencia">Tipo de Incidencia</label>
+                            <select id="filtroTipoIncidencia" name="filtroTipoIncidencia" class="filtro-select">
+                                <option value="">Todos los Tipos</option>
+                                <option value="modulos">Parámetros de Módulos y Estanques</option>
+                                <option value="sensores">Sistemas de Sensores</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="filtro-card">
+                        <div class="filtro-icon">🕐</div>
+                        <div class="filtro-content">
+                            <label for="filtroTurno">Turno de Trabajo</label>
+                            <select id="filtroTurno" name="filtroTurno" class="filtro-select">
+                                <option value="">Todos los Turnos</option>
+                                <option value="Mañana">Mañana</option>
+                                <option value="Tarde">Tarde</option>
+                                <option value="Noche">Noche</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="filtro-card">
+                        <div class="filtro-icon">🏢</div>
+                        <div class="filtro-content">
+                            <label for="filtroCentro">Centro de Operaciones</label>
+                            <select id="filtroCentro" name="filtroCentro" class="filtro-select">
+                                <option value="">Todos los Centros</option>
+                                {% for c in centros %}
+                                    <option value="{{ c.id }}">{{ c.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filtros-actions">
+                    <button id="aplicarFiltrosBtn" class="btn-filtro-aplicar">
+                        <i class="fas fa-filter"></i>
+                        Aplicar Filtros
+                    </button>
+                    <button id="resetFiltrosBtn" class="btn-filtro-reset">
+                        <i class="fas fa-undo"></i>
+                        Restablecer
+                    </button>
+                </div>
+            </section>
+
+            <section id="reporteIncidenciasSection">
+                <div id="incidenciasReporteContainer" class="incidencias-grid">
+                    
+                    {% for inc in incidencias %}
+                    <div class="incidencia-card" 
+                         data-centro="{{ inc.centro.id }}" 
+                         data-turno="{{ inc.turno }}" 
+                         data-tipo="{{ inc.tipo_incidencia }}" 
+                         data-fecha="{{ inc.fecha_hora|date:"Y-m-d" }}">
+                        
+                        {% if inc.centro %}
+                            <h3 class="card-center-title">{{ inc.centro.nombre }}</h3>
+                        {% else %}
+                            <h3 class="card-center-title">Centro no especificado</h3>
+                        {% endif %}
+                        
+                        <p><strong>Fecha:</strong> {{ inc.fecha_hora|date:"d/m/Y H:i" }}</p>
+                        <p><strong>Turno:</strong> {{ inc.turno }}</p>
+                        <p><strong>Tipo:</strong> {{ inc.tipo_incidencia|capfirst|default:"N/A" }}</p>
+                        <p><strong>Módulo:</strong> {{ inc.modulo|default:"N/A" }}</p>
+                        <p><strong>Estanque:</strong> {{ inc.estanque|default:"N/A" }}</p>
+                        
+                        {% if inc.operario_contacto %}
+                            <p><strong>Operario:</strong> {{ inc.operario_contacto.nombre }}</p>
+                        {% else %}
+                            <p><strong>Operario:</strong> N/A</p>
+                        {% endif %}
+                        
+                        <p><strong>Clasificación:</strong> {{ inc.tipo_incidencia_normalizada|default:"N/A" }}</p>
+
+{% if inc.tiempo_resolucion %}
+    <p><strong>T. Resolución:</strong> {{ inc.tiempo_resolucion }} min.</p>
+{% else %}
+    <p><strong>T. Resolución:</strong> N/A</p>
+{% endif %}
+<p><strong>Observación:</strong> {{ inc.observacion|truncatewords:15|default:"Sin observación" }}</p>
+
+                        <div class="card-actions">
+                            <a href="{% url 'editar_incidencia' inc.pk %}" class="edit-btn">Editar</a>
+                            <button type="button" class="delete-btn" data-id="{{ inc.id }}">Eliminar</button>
+                        </div>
+
+                    </div>
+                    {% empty %}
+                        <p class="no-incidencias-message">No hay incidencias registradas todavía.</p>
+                    {% endfor %}
+
+                </div>
+            </section>
+        </div>
+
+        <div class="sidebar-actions">
+            <h4>🛠️ Acciones</h4>
+            
+            <div class="action-group">
+                <span>Navegación</span>
+                <button onclick="window.location.href='{% url 'home' %}'">➕ Nuevo Reporte</button>
+            </div>
+
+            <div class="action-group">
+            <span>Reportes</span>
+   
+            <button class="action-primary action-primary-green" id="exportPdfBtn">🖨️ Generar PDF</button>
+        </div>
+            
+            <div class="action-group">
+                <span>Dashboards</span>
+                <button onclick="window.location.href='{% url 'dashboard' %}'">📈 General</button>
+                <button onclick="window.location.href='power-bi.html'" class="power-bi-btn">📊 Power BI</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{% static 'js/reporte.js' %}"></script>
+    
+</body>
+</html>

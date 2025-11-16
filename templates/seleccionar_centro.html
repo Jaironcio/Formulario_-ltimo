@@ -1,0 +1,75 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seleccionar Centro - Reporte de Incidencias</title>
+    <link rel="stylesheet" href="{% static 'css/formulario.css' %}">
+    <link rel="icon" type="image/png" href="{% static 'imagenes/logo-pestaña.png' %}">
+    
+    <style>
+        /* Estilos simples para centrar la selección */
+        body {
+            background-color: #f0f2f5; /* Un fondo suave */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        .selector-container {
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .selector-container h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .selector-button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            text-decoration: none; /* Para que los <a> se vean como botones */
+            box-sizing: border-box; /* Asegura padding correcto */
+        }
+        .btn-pcc {
+            background-color: #0056b3; /* Azul corporativo */
+        }
+        .btn-pcc:hover {
+            background-color: #004494;
+        }
+        .btn-sj {
+            background-color: #28a745; /* Verde para Santa Juana */
+        }
+        .btn-sj:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="selector-container">
+        <h1>Seleccione el Centro para Registrar Incidencia</h1>
+        
+        <a href="{% url 'formulario_pcc' %}" class="selector-button btn-pcc">
+            Formulario PCC (Trafun, Liquiñe, etc.)
+        </a>
+        
+        <a href="{% url 'formulario_santa_juana' %}" class="selector-button btn-sj">
+            Formulario Santa Juana
+        </a>
+    </div>
+</body>
+</html>
