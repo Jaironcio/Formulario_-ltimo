@@ -78,29 +78,33 @@
                 </div>
             </section>
             
-            <section class="charts-grid">
-                <div class="chart-container">
-                    <h2>📊 Incidencias por Centro</h2>
+            <section class="dashboard-charts-grid">
+                <div class="chart-card">
+                    <h3>📍 Incidencias por Centro</h3>
                     <canvas id="chartIncidenciasCentro"></canvas>
                 </div>
-                <div class="chart-container">
-                    <h2>📈 Tendencia Temporal</h2>
+                <div class="chart-card">
+                    <h3>📈 Tendencia Temporal</h3>
                     <canvas id="chartTendencia"></canvas>
                 </div>
-                <div class="chart-container">
-                    <h2>🔄 Tipos de Incidencia</h2>
+                <div class="chart-card">
+                    <h3>🔄 Módulos vs Sensores</h3>
                     <canvas id="chartTipos"></canvas>
                 </div>
-                <div class="chart-container">
-                    <h2>👥 Operarios que Más Responden</h2>
-                    <canvas id="chartOperarios"></canvas>
+                <div class="chart-card">
+                    <h3>👥 Top 7 Operarios</h3>
+                    <canvas id="chartOperario"></canvas>
                 </div>
-                <div class="chart-container">
-                    <h2>🏷️ Clasificación de Incidencias</h2>
+                <div class="chart-card">
+                    <h3>🏷️ Tipos Específicos</h3>
                     <canvas id="chartClasificacion"></canvas>
                 </div>
+                <div class="chart-card chart-card-highlight">
+                    <h3>🎯 Distribución por Categoría</h3>
+                    <canvas id="chartCategorias"></canvas>
+                </div>
             </section>
-
+            
             <section class="kpi-section">
                 <div class="kpi-header">
                     <h2>KPIs de Cumplimiento (Meta: 20 min / 80%)</h2>
@@ -145,19 +149,32 @@
 
         <div class="sidebar-actions">
             <h4>🛠️ Acciones</h4>
+            
             <div class="action-group">
                 <span>Navegación</span>
+                {% if es_admin %}
                 <button onclick="window.location.href='{% url 'home' %}'">➕ Nuevo Reporte</button>
+                {% endif %}
                 <button onclick="window.location.href='{% url 'reporte' %}'">📄 Ver Reportes</button>
             </div>
+            
             <div class="action-group">
                 <span>Exportar</span>
                 <button id="exportDashboardPdfBtn" class="action-primary-green">📄 Descargar PDF</button>
             </div>
+            
             <div class="action-group">
                 <span>Dashboards</span>
                 <button onclick="window.location.href='{% url 'dashboard' %}'" disabled>📈 General</button>
-                <button onclick="window.location.href='power-bi.html'" class="power-bi-btn">📊 Power BI</button>
+                
+            </div>
+
+            <div class="action-group">
+                <span>Sesión</span>
+                <form method="post" action="{% url 'logout' %}" style="width: 100%;">
+                    {% csrf_token %}
+                    <button type="submit" style="background: #e74c3c;">🔒 Cerrar Sesión</button>
+                </form>
             </div>
         </div>
     </div>
@@ -172,6 +189,8 @@
         window.CHART_OPERARIO_DATA = {{ chart_operario_data_json|safe }};
         window.CHART_CLASIFICACION_LABELS = {{ chart_clasificacion_labels_json|safe }};
         window.CHART_CLASIFICACION_DATA = {{ chart_clasificacion_data_json|safe }};
+        window.CHART_CATEGORIAS_LABELS = {{ chart_categorias_labels_json|safe }};
+        window.CHART_CATEGORIAS_DATA = {{ chart_categorias_data_json|safe }};
     </script>
     
     <script src="{% static 'js/dashboard.js' %}"></script>

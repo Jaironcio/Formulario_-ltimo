@@ -181,6 +181,14 @@
                 <span>Navegación</span>
                 <button onclick="window.location.href='{% url 'home' %}'">🏠 Inicio</button>
             </div>
+            
+            <div class="action-group">
+                <span>Sesión</span>
+                <form method="post" action="{% url 'logout' %}" style="width: 100%;">
+                    {% csrf_token %}
+                    <button type="submit" style="background: #e74c3c;">🔒 Cerrar Sesión</button>
+                </form>
+            </div>
         </div>
         
     </div>

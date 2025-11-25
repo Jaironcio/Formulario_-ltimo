@@ -225,10 +225,31 @@
                         <label for="tipoIncidenciaNormalizada">Tipo de Incidencia Normalizada:</label>
                         <select id="tipoIncidenciaNormalizada" name="tipoIncidenciaNormalizada" required>
                             <option value="">Seleccione el tipo de incidencia</option>
-                            <optgroup label="Condiciones Ambientales">
-                                <option value="oxigeno_alto" {% if incidencia_a_editar.tipo_incidencia_normalizada == 'oxigeno_alto' %}selected{% endif %}>Oxígeno alto/sobresaturación</option>
-                                <option value="temperatura_alta" {% if incidencia_a_editar.tipo_incidencia_normalizada == 'temperatura_alta' %}selected{% endif %}>Temperatura elevada</option>
-                                <option value="temperatura_baja" {% if incidencia_a_editar.tipo_incidencia_normalizada == 'temperatura_baja' %}selected{% endif %}>Temperatura baja</option>
+                            <optgroup label="Falla Operacional">
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque en manejo especial' %}selected{% endif %}>Estanque en manejo especial</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque en flashing' %}selected{% endif %}>Estanque en flashing</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque con cambio de peces' %}selected{% endif %}>Estanque con cambio de peces</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Recambio de agua' %}selected{% endif %}>Recambio de agua</option>
+                            </optgroup>
+                            <optgroup label="Falla Sensores">
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Falla sensor CO2' %}selected{% endif %}>Falla sensor CO2</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Falla sensor T°' %}selected{% endif %}>Falla sensor T°</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Falla sensor pH' %}selected{% endif %}>Falla sensor pH</option>
+                            </optgroup>
+                            <optgroup label="Problemas Eléctricos / Conectividad">
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Corte de energía' %}selected{% endif %}>Corte de energía</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Falla en plataforma de monitoreo' %}selected{% endif %}>Falla en plataforma de monitoreo</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Sin señal o conectividad' %}selected{% endif %}>Sin señal o conectividad</option>
+                            </optgroup>
+                            <optgroup label="Incidencia Normal">
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Temperatura baja' %}selected{% endif %}>Temperatura baja</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Temperatura alta' %}selected{% endif %}>Temperatura alta</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'CO2 alto' %}selected{% endif %}>CO2 alto</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'CO2 bajo' %}selected{% endif %}>CO2 bajo</option>
+                            </optgroup>
+                            <optgroup label="Sin Comunicación">
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Llamada no contestada' %}selected{% endif %}>Llamada no contestada</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Celular centro apagado' %}selected{% endif %}>Celular centro apagado</option>
                             </optgroup>
                         </select>
                     </div>
@@ -259,45 +280,21 @@
             <div class="action-group">
                 <span>Dashboards</span>
                 <button onclick="window.location.href='{% url 'dashboard' %}'">📈 General</button>
-                <button onclick="window.location.href='power-bi.html'" class="power-bi-btn">📊 Power BI</button>
+             
             </div>
             
             <div class="action-group">
-                <span>Navegación</span>
-                <button onclick="window.location.href='{% url 'reporte' %}'">📄 Ver Reportes</button>
-                <button id="backToProfileBtn" title="Cambiar de perfil">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="svg-icon-inline">
-                        <path d="M7 7H21M21 7L17 3M21 7L17 11" stroke="#007f87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M17 17H3M3 17L7 13M3 17L7 21" stroke="#007f87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    Cambiar Perfil
-                </button>
-                <button id="logoutBtn" title="Cerrar sesión">🔒 Cerrar sesión</button>
+                <span>Sesión</span>
+                <form method="post" action="{% url 'logout' %}" style="width: 100%;">
+                    {% csrf_token %}
+                    <button type="submit" style="background: #e74c3c;">🔒 Cerrar Sesión</button>
+                </form>
             </div>
         </div>
         </div>
 
     <script>
-      (function(){
-            const btn = document.getElementById('logoutBtn');
-            if (btn) {
-                btn.addEventListener('click', function(){
-                    // En Django, el logout es simplemente una URL
-                    window.location.href = '/logout/'; // Asegúrate de crear esta URL si necesitas login
-                });
-            }
-            
-            const backBtn = document.getElementById('backToProfileBtn');
-            if (backBtn) {
-                backBtn.addEventListener('click', function(){
-                    window.location.href = 'perfil.html'; // O la URL de perfiles
-                });
-            }
-        })();
-    </script>
-    
-    <script>
-        window.DATOS_MODULOS = {{ datos_modulos_json|safe }};
+      window.DATOS_MODULOS = {{ datos_modulos_json|safe }};
     </script>
 
     <script>

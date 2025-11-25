@@ -146,10 +146,12 @@
 {% endif %}
 <p><strong>Observación:</strong> {{ inc.observacion|truncatewords:15|default:"Sin observación" }}</p>
 
+                        {% if es_admin %}
                         <div class="card-actions">
                             <a href="{% url 'editar_incidencia' inc.pk %}" class="edit-btn">Editar</a>
                             <button type="button" class="delete-btn" data-id="{{ inc.id }}">Eliminar</button>
                         </div>
+                        {% endif %}
 
                     </div>
                     {% empty %}
@@ -165,7 +167,9 @@
             
             <div class="action-group">
                 <span>Navegación</span>
+                {% if es_admin %}
                 <button onclick="window.location.href='{% url 'home' %}'">➕ Nuevo Reporte</button>
+                {% endif %}
             </div>
 
             <div class="action-group">
@@ -177,7 +181,15 @@
             <div class="action-group">
                 <span>Dashboards</span>
                 <button onclick="window.location.href='{% url 'dashboard' %}'">📈 General</button>
-                <button onclick="window.location.href='power-bi.html'" class="power-bi-btn">📊 Power BI</button>
+                
+            </div>
+
+            <div class="action-group">
+                <span>Sesión</span>
+                <form method="post" action="{% url 'logout' %}" style="width: 100%;">
+                    {% csrf_token %}
+                    <button type="submit" style="background: #e74c3c;">🔒 Cerrar Sesión</button>
+                </form>
             </div>
         </div>
     </div>

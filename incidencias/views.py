@@ -7,6 +7,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status 
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required # IMPORTADO
 
 # --- IMPORTACIONES ADICIONALES (Limpias) ---
 from django.utils import timezone
@@ -49,19 +50,28 @@ DATOS_MODULOS_ESTANQUES = {
 }
 
 # --- VISTA 1: EL SELECTOR DE CENTROS (NUEVA PÁGINA DE INICIO) ---
-# (Añade esta nueva función)
+@login_required
 def vista_selector_centro(request):
     """
     Renderiza la nueva página principal para elegir entre PCC o Santa Juana.
+    Si el usuario NO es admin (staff), lo redirige directo al dashboard.
     """
+    if not request.user.is_staff:
+        return redirect('dashboard')
+        
     return render(request, 'seleccionar_centro.html')
 
 
 # --- VISTA INTELIGENTE: Redirige al formulario correcto según el centro ---
+@login_required
 def vista_editar_incidencia_inteligente(request, pk):
     """
     Detecta si la incidencia es de Santa Juana o PCC y redirige al formulario correcto.
     """
+    # Proteccion para visualizadores
+    if not request.user.is_staff:
+        return redirect('dashboard')
+
     incidencia = get_object_or_404(Incidencia, pk=pk)
     
     # Si el centro es Santa Juana, redirige a su formulario
@@ -73,10 +83,15 @@ def vista_editar_incidencia_inteligente(request, pk):
 
 
 # --- VISTA 2: FORMULARIO SANTA JUANA (FUNCIONAL) ---
+@login_required
 def vista_formulario_santa_juana(request, pk=None):
     """
     Renderiza el formulario exclusivo de Santa Juana.
     """
+    # Proteccion para visualizadores
+    if not request.user.is_staff:
+        return redirect('dashboard')
+
     incidencia_a_editar = None
     incidencia_json = 'null'
     
@@ -134,15 +149,21 @@ def vista_formulario_santa_juana(request, pk=None):
         
         # --- ESTAS SON LAS 2 LÍNEAS QUE FALTABAN ---
         'centros': todos_los_centros,  # Para el bucle {% for %} en <script id="centros-data">
-        'centro_actual_slug': centro_sj.slug if centro_sj else '' # Para el data-centro-slug
+        'centro_actual_slug': centro_sj.slug if centro_sj else '', # Para el data-centro-slug
+        'es_admin': request.user.is_staff
     }
     
     # Renderiza el nuevo template de Santa Juana
     return render(request, 'formulario_santa_juana.html', contexto)
 
 # --- VISTA 1: EL FORMULARIO (Nombre original 'vista_formulario') ---
+@login_required
 def vista_formulario_pcc(request, pk=None): 
     
+    # Proteccion para visualizadores
+    if not request.user.is_staff:
+        return redirect('dashboard')
+
     incidencia_a_editar = None
     incidencia_json = 'null'
 
@@ -196,7 +217,8 @@ def vista_formulario_pcc(request, pk=None):
         'datos_modulos_json': json.dumps(DATOS_MODULOS_ESTANQUES),
         'datos_operarios_json': json.dumps(operarios_por_centro),
         'incidencia_a_editar': incidencia_a_editar,
-        'incidencia_a_editar_json': incidencia_json
+        'incidencia_a_editar_json': incidencia_json,
+        'es_admin': request.user.is_staff
     }
     
     # Renderiza el formulario original
@@ -204,6 +226,7 @@ def vista_formulario_pcc(request, pk=None):
 
 
 # --- VISTA 2: LA PÁGINA DE REPORTES (Original) ---
+@login_required
 def vista_reporte(request):
     
     lista_de_incidencias = Incidencia.objects.select_related(
@@ -229,13 +252,15 @@ def vista_reporte(request):
     contexto = {
         'incidencias': lista_de_incidencias,
         'centros': todos_los_centros,
-        'filtros_aplicados': request.GET
+        'filtros_aplicados': request.GET,
+        'es_admin': request.user.is_staff
     }
     
     return render(request, 'reporte.html', contexto)
 
 
 # --- VISTA 3: DASHBOARD (Original) ---
+@login_required
 def vista_dashboard(request):
     
     periodo_filtro = request.GET.get('periodo', 'all')
@@ -295,41 +320,91 @@ def vista_dashboard(request):
     chart_clasificacion_labels = [item['tipo_incidencia_normalizada'] for item in chart_clasificacion_query]
     chart_clasificacion_data = [item['count'] for item in chart_clasificacion_query]
 
-    kpi_query = base_query.filter(centro__isnull=False, tiempo_resolucion__isnull=False) \
-        .values('centro__nombre') \
-        .annotate(
-            total_incidencias=Count('id'),
-            en_kpi=Count('id', filter=Q(tiempo_resolucion__lte=20)),
-        ).order_by('-total_incidencias')
+    # --- NUEVO: Agrupación por Categoría Mayor ---
+    mapping_categorias = {
+        'Falla Operacional': ['Estanque en manejo especial', 'Estanque en flashing', 'Estanque con cambio de peces', 'Recambio de agua'],
+        'Falla Sensores': ['Falla sensor CO2', 'Falla sensor T°', 'Falla sensor pH'],
+        'Problemas Eléctricos / Conectividad': ['Corte de energía', 'Falla en plataforma de monitoreo', 'Sin señal o conectividad'],
+        'Incidencia Normal': ['Temperatura baja', 'Temperatura alta', 'CO2 alto', 'CO2 bajo'],
+        'Sin Comunicación': ['Llamada no contestada', 'Celular centro apagado']
+    }
+    
+    # Inicializar contadores
+    conteo_categorias = {
+        'Falla Operacional': 0,
+        'Falla Sensores': 0,
+        'Problemas Eléctricos / Conectividad': 0,
+        'Incidencia Normal': 0,
+        'Sin Comunicación': 0,
+        'Otros': 0
+    }
+
+    # Clasificar "al vuelo"
+    todos_los_tipos = base_query.values_list('tipo_incidencia_normalizada', flat=True)
+    
+    for tipo_texto in todos_los_tipos:
+        if not tipo_texto: continue
+        encontrado = False
+        for categoria, lista_tipos in mapping_categorias.items():
+            if tipo_texto in lista_tipos:
+                conteo_categorias[categoria] += 1
+                encontrado = True
+                break
+        if not encontrado:
+            conteo_categorias['Otros'] += 1
+            
+    # Preparar arrays para el gráfico
+    chart_categorias_labels = list(conteo_categorias.keys())
+    chart_categorias_data = list(conteo_categorias.values())
+    # ---------------------------------------------
+
+    # Calcular KPIs (simulado para el ejemplo)
+    centros = Centro.objects.all()
     kpi_lista_final = []
     
-    for item in kpi_query:
-        total = item['total_incidencias']
-        en_kpi = item['en_kpi']
-        porcentaje = round((en_kpi / total) * 100) if total > 0 else 0
+    for c in centros:
+        total_c = base_query.filter(centro=c).count()
+        en_kpi = base_query.filter(centro=c, tiempo_resolucion__lte=20).count()
+        porcentaje = 0
+        if total_c > 0:
+            porcentaje = int((en_kpi / total_c) * 100)
+        
         kpi_lista_final.append({
-            'centro_nombre': item['centro__nombre'],
-            'total_incidencias': total, 'en_kpi': en_kpi,
-            'porcentaje': porcentaje, 'cumple_meta': porcentaje >= 80
+            'centro_nombre': c.nombre,
+            'total_incidencias': total_c,
+            'en_kpi': en_kpi,
+            'porcentaje': porcentaje,
+            'cumple_meta': porcentaje >= 80
         })
 
     contexto = {
         'total_incidencias': total_incidencias,
-        'centro_mas_incidencias': centro_mas_incidencias,
         'alto_riesgo_count': alto_riesgo_count,
         'promedio_resolucion': promedio_resolucion,
+        'centro_mas_incidencias': centro_mas_incidencias,
+        
         'chart_centro_labels_json': json.dumps(chart_centro_labels),
         'chart_centro_counts_json': json.dumps(chart_centro_counts),
+        
         'chart_tendencia_labels_json': json.dumps(chart_tendencia_labels),
         'chart_tendencia_data_json': json.dumps(chart_tendencia_data),
+        
         'chart_tipos_data_json': json.dumps(chart_tipos_data),
+        
         'chart_operario_labels_json': json.dumps(chart_operario_labels),
         'chart_operario_data_json': json.dumps(chart_operario_data),
+
         'chart_clasificacion_labels_json': json.dumps(chart_clasificacion_labels),
         'chart_clasificacion_data_json': json.dumps(chart_clasificacion_data),
+        
+        # NUEVO: Gráfico por Categorías
+        'chart_categorias_labels_json': json.dumps(chart_categorias_labels),
+        'chart_categorias_data_json': json.dumps(chart_categorias_data),
+        
         'kpi_data': kpi_lista_final,
         'centros': Centro.objects.all().order_by('nombre'),
-        'filtros_aplicados': request.GET
+        'filtros_aplicados': request.GET,
+        'es_admin': request.user.is_staff
     }
     
     return render(request, 'dashboard.html', contexto)

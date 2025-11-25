@@ -1,0 +1,161 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - Cermaq Chile</title>
+    <link rel="icon" type="image/png" href="{% static 'imagenes/logo-pestaña.png' %}">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #006666, #008B8B, #20B2AA, #48D1CC);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .login-logo {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            color: #006666;
+            margin-bottom: 5px;
+        }
+
+        p {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #B2DFDB;
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #008B8B;
+            box-shadow: 0 0 0 3px rgba(0, 139, 139, 0.1);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #006666, #008B8B);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 102, 102, 0.3);
+        }
+
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            border: 1px solid #ffcdd2;
+        }
+
+        .login-footer {
+            margin-top: 30px;
+            font-size: 0.8em;
+            color: #999;
+        }
+        
+        .login-footer p {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-container">
+    <div class="login-header">
+        <img src="{% static 'imagenes/logo-reporte-cermaq.png' %}" alt="Logo Cermaq" class="login-logo">
+        <h2>Iniciar Sesión</h2>
+        <p>Sistema de Gestión de Incidencias</p>
+    </div>
+
+    <form method="post" action="{% url 'login' %}">
+        {% csrf_token %}
+        
+        {% if form.errors %}
+            <div class="error-message">
+                Usuario o contraseña incorrectos.
+            </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="id_username">Usuario</label>
+            <input type="text" name="username" autofocus="" autocapitalize="none" autocomplete="username" maxlength="150" required="" id="id_username" placeholder="Ingrese su usuario">
+        </div>
+
+        <div class="form-group">
+            <label for="id_password">Contraseña</label>
+            <input type="password" name="password" autocomplete="current-password" required="" id="id_password" placeholder="Ingrese su contraseña">
+        </div>
+
+        <button type="submit" class="login-btn">Ingresar</button>
+    </form>
+    
+    <div class="login-footer">
+        <p>© 2024 Cermaq Chile</p>
+    </div>
+</div>
+
+</body>
+</html>

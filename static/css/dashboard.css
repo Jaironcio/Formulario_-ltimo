@@ -186,10 +186,75 @@
     font-size: 1.2em;
 }
 
+.dashboard-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.chart-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 25px;
+    position: relative;
+    height: 400px;
+    transition: all 0.3s ease;
+}
+
+.chart-card:hover {
+    box-shadow: 0 6px 20px rgba(0, 102, 102, 0.15);
+    transform: translateY(-3px);
+}
+
+.chart-card h3 {
+    color: #006666;
+    margin: 0 0 20px 0;
+    text-align: center;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+/* Estilo especial para el gráfico destacado */
+.chart-card-highlight {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8f5f4 100%);
+    border: 2px solid #008B8B;
+    box-shadow: 0 8px 24px rgba(0, 139, 139, 0.2);
+}
+
+.chart-card-highlight:hover {
+    box-shadow: 0 12px 32px rgba(0, 139, 139, 0.3);
+    transform: translateY(-5px);
+}
+
+.chart-card-highlight h3 {
+    color: #004d4d;
+    font-weight: 700;
+    font-size: 1.15em;
+    background: linear-gradient(135deg, #006666, #008B8B);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
 /* Responsividad para los gráficos */
 @media (max-width: 900px) {
     .charts-grid {
         /* Hacemos 1 sola columna en pantallas más pequeñas */
+        grid-template-columns: 1fr;
+    }
+    
+    .dashboard-charts-grid {
+        /* 2 columnas en tablets */
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .dashboard-charts-grid {
+        /* 1 columna en móviles */
         grid-template-columns: 1fr;
     }
 }

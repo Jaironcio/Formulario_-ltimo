@@ -24,6 +24,8 @@ from django.urls import path, include # <-- Asegúrate de importar 'include'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # URLs de autenticación (login, logout, password_change, etc.)
+    path('accounts/', include('django.contrib.auth.urls')),
     # Incluye TODAS las rutas de la aplicación 'incidencias'
     path('', include('incidencias.urls')),
     

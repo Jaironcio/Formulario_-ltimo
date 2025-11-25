@@ -5,12 +5,13 @@
     chartTendenciaLabels, chartTendenciaData,
     chartTiposData,
     chartOperarioLabels, chartOperarioData,
-    chartClasificacionLabels, chartClasificacionData
+    chartClasificacionLabels, chartClasificacionData,
+    chartCategoriasLabels, chartCategoriasData
 ) {
     
     document.addEventListener('DOMContentLoaded', function() {
         
-        // --- SECCIONES 1-5: LÓGICA DE GRÁFICOS (Sin cambios) ---
+        // --- SECCIONES 1-6: LÓGICA DE GRÁFICOS ---
         
         // --- 1. Gráfico "Incidencias por Centro" (Barras) ---
         const ctxCentro = document.getElementById('chartIncidenciasCentro');
@@ -82,7 +83,42 @@
             }
         }
 
-        // --- 6. Lógica de Filtros (Sin cambios) ---
+        // --- 6. NUEVO: Gráfico "Categorías" (Pie) ---
+        const ctxCategorias = document.getElementById('chartCategorias');
+        if (ctxCategorias && chartCategoriasLabels && chartCategoriasData) {
+            // Verificar si hay datos (suma > 0)
+            const sumaCategorias = chartCategoriasData.reduce((a, b) => a + b, 0);
+            
+            if (sumaCategorias === 0) {
+                ctxCategorias.parentElement.innerHTML = "<h3>Distribución por Categoría Mayor</h3><p class='loading-message'>No hay datos.</p>";
+            } else {
+                new Chart(ctxCategorias, {
+                    type: 'pie',
+                    data: { 
+                        labels: chartCategoriasLabels, 
+                        datasets: [{ 
+                            data: chartCategoriasData, 
+                            backgroundColor: [
+                                'rgba(255, 99, 132, 0.8)',  // Falla Operacional (Rojo)
+                                'rgba(54, 162, 235, 0.8)',  // Falla Sensores (Azul)
+                                'rgba(255, 206, 86, 0.8)',  // Eléctricos (Amarillo)
+                                'rgba(75, 192, 192, 0.8)',  // Normal (Verde)
+                                'rgba(153, 102, 255, 0.8)', // Sin Comunicación (Morado)
+                                'rgba(201, 203, 207, 0.8)'  // Otros (Gris)
+                            ], 
+                            borderWidth: 1 
+                        }] 
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { position: 'bottom' } } 
+                    }
+                });
+            }
+        }
+
+        // --- 7. Lógica de Filtros (Sin cambios) ---
         const actualizarBtn = document.getElementById('actualizarDashboard');
         const filtroFecha = document.getElementById('dashboardFiltroFecha');
         const filtroCentro = document.getElementById('dashboardFiltroCentro');
@@ -189,5 +225,6 @@
     window.CHART_TENDENCIA_LABELS, window.CHART_TENDENCIA_DATA,
     window.CHART_TIPOS_DATA,
     window.CHART_OPERARIO_LABELS, window.CHART_OPERARIO_DATA,
-    window.CHART_CLASIFICACION_LABELS, window.CHART_CLASIFICACION_DATA
+    window.CHART_CLASIFICACION_LABELS, window.CHART_CLASIFICACION_DATA,
+    window.CHART_CATEGORIAS_LABELS, window.CHART_CATEGORIAS_DATA
 );

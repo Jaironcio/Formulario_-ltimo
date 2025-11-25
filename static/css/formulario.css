@@ -42,33 +42,28 @@ h1 {
     align-items: flex-start;
     justify-content: center;
     gap: 24px;
-    max-width: 1400px;
+    max-width: 1600px; /* Aumentado para dar más espacio */
     margin: 0 auto;
     padding: 20px;
 }
 
 .page-layout .form-container {
-    flex: 1 1 0;
-    min-width: 0; /* evita overflow horizontal */
+    flex: 0 0 1200px; /* Ancho fijo de 1200px, no crece ni se encoge */
+    max-width: 1200px;
+    width: 1200px;
+    margin: 0; /* Elimina márgenes para que el page-layout controle el espaciado */
 }
 
 /* === 3. Contenedor del Formulario === */
 .form-container {
-    max-width: 700px; /* Ancho para el formulario */
+    max-width: 1200px; /* Ancho estandarizado para todas las páginas */
+    width: 1200px; /* Ancho fijo */
     margin: 50px auto;
     padding: 40px;
     background: rgba(255, 255, 255, 0.95);
     border-radius: 20px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
     transition: max-width 0.3s ease; /* Pequeña animación */
-}
-
-/* REGLA DE EXCEPCIÓN:
-  Esto sobreescribe lo anterior SÓLO en la página de reportes,
-  gracias al ID #reporte-container.
-*/
-#reporte-container {
-    max-width: 1200px; /* Ancho para los reportes */
 }
 
 @keyframes fadeInUp {

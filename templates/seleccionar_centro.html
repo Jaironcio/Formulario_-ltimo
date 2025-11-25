@@ -16,6 +16,29 @@
             align-items: center;
             justify-content: center;
             height: 100vh;
+            position: relative;
+        }
+        .logout-btn-top {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+        .logout-btn-top form {
+            margin: 0;
+        }
+        .logout-btn-top button {
+            padding: 10px 20px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: background-color 0.3s ease;
+        }
+        .logout-btn-top button:hover {
+            background: #c0392b;
         }
         .selector-container {
             max-width: 600px;
@@ -60,6 +83,14 @@
     </style>
 </head>
 <body>
+    <!-- Botón de cerrar sesión -->
+    <div class="logout-btn-top">
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit">🔒 Cerrar Sesión</button>
+        </form>
+    </div>
+    
     <div class="selector-container">
         <h1>Seleccione el Centro para Registrar Incidencia</h1>
         
