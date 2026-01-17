@@ -114,7 +114,69 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // --- 6. Lógica de Exportar PDF (Formato Ejecutivo con Tabla) ---
+    // --- 6. Lógica de Captura de Pantalla Completa ---
+    
+    const capturaButton = document.getElementById('exportCapturaBtn');
+    
+    if (capturaButton) {
+        capturaButton.addEventListener('click', function() {
+            
+            if (typeof html2canvas === 'undefined') {
+                alert('Error: La librería html2canvas no está cargada.');
+                return;
+            }
+            
+            const allCards = document.querySelectorAll('.incidencia-card-premium');
+            
+            if (allCards.length === 0) {
+                alert('No hay incidencias para capturar.');
+                return;
+            }
+            
+            const originalText = capturaButton.innerHTML;
+            capturaButton.innerHTML = '📸 Capturando...';
+            capturaButton.disabled = true;
+            
+            // Ocultar temporalmente la sidebar para la captura
+            const sidebar = document.querySelector('.sidebar-actions');
+            const originalDisplay = sidebar ? sidebar.style.display : '';
+            if (sidebar) sidebar.style.display = 'none';
+            
+            // Capturar el contenedor del reporte
+            const reporteContainer = document.getElementById('reporte-container');
+            
+            html2canvas(reporteContainer, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff'
+            }).then(function(canvas) {
+                // Restaurar sidebar
+                if (sidebar) sidebar.style.display = originalDisplay;
+                
+                // Convertir canvas a imagen y descargar
+                const link = document.createElement('a');
+                const fechaArchivo = new Date().toISOString().split('T')[0];
+                link.download = 'Captura_Reporte_Incidencias_' + fechaArchivo + '.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                capturaButton.innerHTML = originalText;
+                capturaButton.disabled = false;
+            }).catch(function(error) {
+                console.error('Error al capturar:', error);
+                alert('Error al generar la captura de pantalla.');
+                
+                // Restaurar sidebar en caso de error
+                if (sidebar) sidebar.style.display = originalDisplay;
+                
+                capturaButton.innerHTML = originalText;
+                capturaButton.disabled = false;
+            });
+        });
+    }
+    
+    // --- 7. Lógica de Exportar PDF (Formato Ejecutivo con Tabla) ---
     
     const pdfButton = document.getElementById('exportPdfBtn');
 
