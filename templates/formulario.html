@@ -218,29 +218,43 @@
                         <label for="tipoIncidenciaNormalizada">Tipo de Incidencia Normalizada:</label>
                         <select id="tipoIncidenciaNormalizada" name="tipoIncidenciaNormalizada" required>
                             <option value="">Seleccione el tipo de incidencia</option>
-                            <optgroup label="Falla Operacional">
-                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque en manejo especial' %}selected{% endif %}>Estanque en manejo especial</option>
-                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque en flashing' %}selected{% endif %}>Estanque en flashing</option>
-                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque con cambio de peces' %}selected{% endif %}>Estanque con cambio de peces</option>
+                            <optgroup label="Manejo Operacional">
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque en Tratamiento' %}selected{% endif %}>Estanque en Tratamiento</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque en Manejo' %}selected{% endif %}>Estanque en Manejo</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque con traslado de peces' %}selected{% endif %}>Estanque con traslado de peces</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque en Flashing' %}selected{% endif %}>Estanque en Flashing</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque en Vacunación' %}selected{% endif %}>Estanque en Vacunación</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Desdoble de estanque' %}selected{% endif %}>Desdoble de estanque</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Recambio de agua' %}selected{% endif %}>Recambio de agua</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque vacío' %}selected{% endif %}>Estanque vacío</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque en selección' %}selected{% endif %}>Estanque en selección</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Estanque en ayuna' %}selected{% endif %}>Estanque en ayuna</option>
                             </optgroup>
-                            <optgroup label="Falla Sensores">
+                            <optgroup label="Problemas de Sensores">
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Manipulando sensor' %}selected{% endif %}>Manipulando sensor</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Falla sensor CO2' %}selected{% endif %}>Falla sensor CO2</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Falla sensor T°' %}selected{% endif %}>Falla sensor T°</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Falla sensor pH' %}selected{% endif %}>Falla sensor pH</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Problemas con la TEMPERATURA' %}selected{% endif %}>Problemas con la TEMPERATURA</option>
                             </optgroup>
                             <optgroup label="Problemas Eléctricos / Conectividad">
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Corte de energía' %}selected{% endif %}>Corte de energía</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Corte de luz' %}selected{% endif %}>Corte de luz</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Falla en plataforma de monitoreo' %}selected{% endif %}>Falla en plataforma de monitoreo</option>
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Problemas con la plataforma' %}selected{% endif %}>Problemas con la plataforma</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Sin señal o conectividad' %}selected{% endif %}>Sin señal o conectividad</option>
                             </optgroup>
-                            <optgroup label="Incidencia Normal">
+                            <optgroup label="Problemas Operacionales Específicos">
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Problemas con el cono de oxigenación' %}selected{% endif %}>Problemas con el cono de oxigenación</option>
+                            </optgroup>
+                            <optgroup label="Parámetros Fuera de Rango">
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Temperatura baja' %}selected{% endif %}>Temperatura baja</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Temperatura alta' %}selected{% endif %}>Temperatura alta</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'CO2 alto' %}selected{% endif %}>CO2 alto</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'CO2 bajo' %}selected{% endif %}>CO2 bajo</option>
                             </optgroup>
-                            <optgroup label="Sin Comunicación">
+                            <optgroup label="Comunicación">
+                                <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Sin respuesta del centro' %}selected{% endif %}>Sin respuesta del centro</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Llamada no contestada' %}selected{% endif %}>Llamada no contestada</option>
                                 <option {% if incidencia_a_editar.tipo_incidencia_normalizada == 'Celular centro apagado' %}selected{% endif %}>Celular centro apagado</option>
                             </optgroup>

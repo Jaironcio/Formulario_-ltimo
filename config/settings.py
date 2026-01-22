@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',  # Para filtros como intcomma
     # --- Nuestras apps ---
     'rest_framework',  # Para la API
     'incidencias',     # Tu app de formulario

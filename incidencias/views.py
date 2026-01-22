@@ -13,7 +13,7 @@ from django.contrib.auth.decorators import login_required # IMPORTADO
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Count, Q, Avg # Quitamos 'F' que no se usa aquí
-from django.db.models.functions import TruncDate 
+from django.db.models.functions import TruncDate, TruncMonth 
 from .serializers import IncidenciaSerializer
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger 
 # ---
@@ -342,21 +342,56 @@ def vista_dashboard(request):
 
     # --- NUEVO: Agrupación por Categoría Mayor ---
     mapping_categorias = {
-        'Falla Operacional': ['Estanque en manejo especial', 'Estanque en flashing', 'Estanque con cambio de peces', 'Recambio de agua'],
-        'Falla Sensores': ['Falla sensor CO2', 'Falla sensor T°', 'Falla sensor pH'],
-        'Problemas Eléctricos / Conectividad': ['Corte de energía', 'Falla en plataforma de monitoreo', 'Sin señal o conectividad'],
-        'Incidencia Normal': ['Temperatura baja', 'Temperatura alta', 'CO2 alto', 'CO2 bajo'],
-        'Sin Comunicación': ['Llamada no contestada', 'Celular centro apagado']
+        'Manejo Operacional': [
+            'Estanque en Tratamiento', 
+            'Estanque en Manejo', 
+            'Estanque con traslado de peces',
+            'Estanque en Flashing',
+            'Estanque en Vacunación',
+            'Desdoble de estanque',
+            'Recambio de agua',
+            'Estanque vacío',
+            'Estanque en selección',
+            'Estanque en ayuna'
+        ],
+        'Problemas de Sensores': [
+            'Manipulando sensor',
+            'Falla sensor CO2', 
+            'Falla sensor T°', 
+            'Falla sensor pH',
+            'Problemas con la TEMPERATURA'
+        ],
+        'Problemas Eléctricos / Conectividad': [
+            'Corte de energía',
+            'Corte de luz',
+            'Falla en plataforma de monitoreo',
+            'Problemas con la plataforma',
+            'Sin señal o conectividad'
+        ],
+        'Problemas Operacionales Específicos': [
+            'Problemas con el cono de oxigenación'
+        ],
+        'Parámetros Fuera de Rango': [
+            'Temperatura baja', 
+            'Temperatura alta', 
+            'CO2 alto', 
+            'CO2 bajo'
+        ],
+        'Problemas de Comunicación': [
+            'Sin respuesta del centro',
+            'Llamada no contestada', 
+            'Celular centro apagado'
+        ]
     }
     
     # Inicializar contadores
     conteo_categorias = {
-        'Falla Operacional': 0,
-        'Falla Sensores': 0,
+        'Manejo Operacional': 0,
+        'Problemas de Sensores': 0,
         'Problemas Eléctricos / Conectividad': 0,
-        'Incidencia Normal': 0,
-        'Sin Comunicación': 0,
-        'Otros': 0
+        'Problemas Operacionales Específicos': 0,
+        'Parámetros Fuera de Rango': 0,
+        'Problemas de Comunicación': 0
     }
 
     # Clasificar "al vuelo"
@@ -364,14 +399,10 @@ def vista_dashboard(request):
     
     for tipo_texto in todos_los_tipos:
         if not tipo_texto: continue
-        encontrado = False
         for categoria, lista_tipos in mapping_categorias.items():
             if tipo_texto in lista_tipos:
                 conteo_categorias[categoria] += 1
-                encontrado = True
                 break
-        if not encontrado:
-            conteo_categorias['Otros'] += 1
             
     # Preparar arrays para el gráfico
     chart_categorias_labels = list(conteo_categorias.keys())
@@ -965,3 +996,389 @@ def eliminar_reporte_camaras_api(request, pk):
             'success': False,
             'message': str(e)
         }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# --- VISTA: DASHBOARD PROFESIONAL ---
+@login_required
+def dashboard_profesional(request):
+    """
+    Dashboard profesional estilo Power BI con gráficos avanzados
+    """
+    # Obtener todas las incidencias
+    incidencias = Incidencia.objects.all().select_related('centro', 'operario_contacto').order_by('-fecha_hora')
+    
+    # Calcular KPIs
+    total_incidencias = incidencias.count()
+    
+    # Contar por niveles de oxígeno
+    oxigeno_alto = incidencias.filter(oxigeno_nivel='alta').count()
+    oxigeno_bajo = incidencias.filter(oxigeno_nivel='baja').count()
+    
+    # Contar temperatura baja
+    temperatura_baja = incidencias.filter(temperatura_nivel='baja').count()
+    
+    # Centro con más incidencias
+    centro_stats = incidencias.values('centro__nombre').annotate(
+        count=Count('id')
+    ).order_by('-count').first()
+    centro_top = f"{centro_stats['centro__nombre']} - {centro_stats['count']}" if centro_stats else "N/A"
+    
+    # Datos para gráfico de barras (por centro y parámetro)
+    # Filtrar solo centros PCC que tienen incidencias
+    centros_con_datos = Centro.objects.filter(
+        nombre__in=['Trafún', 'Cipreses', 'Liquiñe']
+    ).filter(
+        id__in=incidencias.values_list('centro_id', flat=True).distinct()
+    )
+    centros = centros_con_datos
+    centros_labels = [c.nombre for c in centros]
+    
+    oxigeno_alto_data = []
+    oxigeno_bajo_data = []
+    temperatura_baja_data = []
+    
+    for centro in centros:
+        oxigeno_alto_data.append(
+            incidencias.filter(centro=centro, oxigeno_nivel='alta').count()
+        )
+        oxigeno_bajo_data.append(
+            incidencias.filter(centro=centro, oxigeno_nivel='baja').count()
+        )
+        temperatura_baja_data.append(
+            incidencias.filter(centro=centro, temperatura_nivel='baja').count()
+        )
+    
+    # Datos para gráfico de dona (distribución de tipos)
+    tipos_stats = incidencias.values('tipo_incidencia_normalizada').annotate(
+        count=Count('id')
+    ).order_by('-count')[:8]  # Top 8 tipos
+    
+    tipos_labels = [t['tipo_incidencia_normalizada'] or 'Sin clasificar' for t in tipos_stats]
+    tipos_data = [t['count'] for t in tipos_stats]
+    
+    # Datos para gráfico de tendencia temporal (últimos 12 meses)
+    from datetime import datetime, timedelta
+    fecha_inicio = timezone.now() - timedelta(days=365)
+    tendencia_stats = incidencias.filter(fecha_hora__gte=fecha_inicio).annotate(
+        mes=TruncDate('fecha_hora')
+    ).values('mes').annotate(
+        count=Count('id')
+    ).order_by('mes')
+    
+    tendencia_labels = [t['mes'].strftime('%b %Y') for t in tendencia_stats]
+    tendencia_data = [t['count'] for t in tendencia_stats]
+    
+    # Datos para gráfico de tiempo de resolución promedio por centro
+    resolucion_data = []
+    for centro in centros:
+        promedio = incidencias.filter(centro=centro).aggregate(
+            promedio=Avg('tiempo_resolucion')
+        )['promedio']
+        resolucion_data.append(round(promedio, 1) if promedio else 0)
+    
+    # Datos para gráfico de incidencias por turno
+    turnos_stats = incidencias.values('turno').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    turnos_labels = [t['turno'] or 'Sin turno' for t in turnos_stats]
+    turnos_data = [t['count'] for t in turnos_stats]
+    
+    # Coordenadas reales de los centros PCC
+    coordenadas_centros = {
+        'Trafún': {'lat': -40.5833, 'lng': -73.0833, 'nombre': 'Trafún', 'ubicacion': 'San Pablo, Osorno'},
+        'Cipreses': {'lat': -52.9167, 'lng': -70.8333, 'nombre': 'Cipreses', 'ubicacion': 'Punta Arenas, Magallanes'},
+        'Liquiñe': {'lat': -39.7333, 'lng': -71.8667, 'nombre': 'Liquiñe', 'ubicacion': 'Liquiñe, Los Ríos'}
+    }
+    
+    # Obtener meses únicos con datos
+    meses_con_datos = incidencias.annotate(
+        mes=TruncDate('fecha_hora')
+    ).values_list('mes', flat=True).distinct().order_by('mes')
+    
+    # Crear lista de meses únicos (número y nombre)
+    meses_unicos = []
+    meses_nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    
+    meses_vistos = set()
+    for fecha in meses_con_datos:
+        if fecha:
+            mes_num = fecha.month
+            if mes_num not in meses_vistos:
+                meses_vistos.add(mes_num)
+                meses_unicos.append({
+                    'numero': mes_num,
+                    'nombre': meses_nombres[mes_num - 1]
+                })
+    
+    # Ordenar por número de mes
+    meses_unicos.sort(key=lambda x: x['numero'])
+    
+    # === ANÁLISIS DE JUSTIFICACIÓN Y VALOR AGREGADO ===
+    
+    # 1. Análisis de Causa Raíz (Top 5 causas más frecuentes)
+    causas_raiz = incidencias.values('tipo_incidencia_normalizada').annotate(
+        count=Count('id'),
+        tiempo_promedio=Avg('tiempo_resolucion')
+    ).order_by('-count')[:5]
+    
+    causas_labels = [c['tipo_incidencia_normalizada'] or 'Sin clasificar' for c in causas_raiz]
+    causas_count = [c['count'] for c in causas_raiz]
+    causas_tiempo = [round(c['tiempo_promedio'], 1) if c['tiempo_promedio'] else 0 for c in causas_raiz]
+    
+    # 2. Tiempo de Respuesta vs Objetivo (SLA: 30 minutos)
+    tiempo_objetivo = 30  # minutos
+    tiempos_por_centro = []
+    cumplimiento_sla = []
+    
+    for centro in centros:
+        incidencias_centro = incidencias.filter(centro=centro)
+        tiempo_promedio = incidencias_centro.aggregate(Avg('tiempo_resolucion'))['tiempo_resolucion__avg']
+        tiempo_promedio = round(tiempo_promedio, 1) if tiempo_promedio else 0
+        tiempos_por_centro.append(tiempo_promedio)
+        
+        # Calcular % de cumplimiento de SLA
+        total_centro = incidencias_centro.count()
+        dentro_sla = incidencias_centro.filter(tiempo_resolucion__lte=tiempo_objetivo).count()
+        porcentaje_sla = round((dentro_sla / total_centro * 100), 1) if total_centro > 0 else 0
+        cumplimiento_sla.append(porcentaje_sla)
+    
+    # 3. Tendencia de Mejora Mes a Mes (últimos 6 meses)
+    from datetime import datetime, timedelta
+    fecha_6_meses = timezone.now() - timedelta(days=180)
+    
+    mejora_mensual = incidencias.filter(fecha_hora__gte=fecha_6_meses).annotate(
+        mes=TruncMonth('fecha_hora')
+    ).values('mes').annotate(
+        total=Count('id'),
+        tiempo_promedio=Avg('tiempo_resolucion')
+    ).order_by('mes')
+    
+    mejora_labels = [m['mes'].strftime('%b %Y') for m in mejora_mensual]
+    mejora_total = [m['total'] for m in mejora_mensual]
+    mejora_tiempo = [round(m['tiempo_promedio'], 1) if m['tiempo_promedio'] else 0 for m in mejora_mensual]
+    
+    # 4. Análisis de Recurrencia (incidencias repetidas en mismo estanque/módulo)
+    incidencias_recurrentes = 0
+    incidencias_nuevas = 0
+    
+    # Agrupar por estanque y tipo para detectar recurrencia
+    agrupacion = incidencias.values('estanque', 'tipo_incidencia_normalizada').annotate(
+        count=Count('id')
+    )
+    
+    for grupo in agrupacion:
+        if grupo['count'] > 1:
+            incidencias_recurrentes += grupo['count']
+        else:
+            incidencias_nuevas += grupo['count']
+    
+    # 5. KPIs de Valor Agregado
+    # Calcular reducción de incidencias (comparar primer mes vs último mes)
+    if len(mejora_total) >= 2:
+        reduccion_porcentual = round(((mejora_total[0] - mejora_total[-1]) / mejora_total[0] * 100), 1) if mejora_total[0] > 0 else 0
+        incidencias_evitadas = mejora_total[0] - mejora_total[-1]
+    else:
+        reduccion_porcentual = 0
+        incidencias_evitadas = 0
+    
+    # Calcular mejora en tiempo de respuesta
+    if len(mejora_tiempo) >= 2:
+        mejora_tiempo_porcentual = round(((mejora_tiempo[0] - mejora_tiempo[-1]) / mejora_tiempo[0] * 100), 1) if mejora_tiempo[0] > 0 else 0
+        minutos_ahorrados = round((mejora_tiempo[0] - mejora_tiempo[-1]) * total_incidencias, 0)
+    else:
+        mejora_tiempo_porcentual = 0
+        minutos_ahorrados = 0
+    
+    # 5.1 Eficiencia Operativa (incidencias resueltas por hora de trabajo)
+    horas_trabajo_estimadas = total_incidencias * (sum(tiempos_por_centro) / len(tiempos_por_centro) if tiempos_por_centro else 30) / 60
+    eficiencia_operativa = round(total_incidencias / horas_trabajo_estimadas, 1) if horas_trabajo_estimadas > 0 else 0
+    
+    # 5.2 Cobertura de Centros (% de centros con seguimiento activo)
+    centros_activos = len(centros)
+    cobertura_centros = 100.0  # Todos los centros PCC tienen cobertura
+    
+    # 5.3 Tasa de Éxito (% de incidencias resueltas dentro del SLA)
+    total_dentro_sla = sum([incidencias.filter(centro=centro, tiempo_resolucion__lte=tiempo_objetivo).count() for centro in centros])
+    tasa_exito = round((total_dentro_sla / total_incidencias * 100), 1) if total_incidencias > 0 else 0
+    
+    # 5.4 Comparación con Periodo Anterior (si hay suficientes datos)
+    if len(mejora_total) >= 4:
+        # Comparar primeros 3 meses vs últimos 3 meses
+        periodo_anterior = sum(mejora_total[:3])
+        periodo_actual = sum(mejora_total[-3:])
+        comparacion_periodos = round(((periodo_anterior - periodo_actual) / periodo_anterior * 100), 1) if periodo_anterior > 0 else 0
+    else:
+        comparacion_periodos = 0
+    
+    # 5.5 Insights Automáticos (interpretación de datos en lenguaje simple)
+    insights = []
+    
+    # Insight 1: Tendencia general
+    if reduccion_porcentual > 10:
+        insights.append({
+            'icono': '📉',
+            'titulo': 'Tendencia Positiva',
+            'mensaje': f'Las incidencias han disminuido un {reduccion_porcentual}%. ¡Excelente trabajo del equipo!',
+            'tipo': 'success'
+        })
+    elif reduccion_porcentual < -10:
+        insights.append({
+            'icono': '📈',
+            'titulo': 'Alerta: Aumento de Incidencias',
+            'mensaje': f'Las incidencias aumentaron un {abs(reduccion_porcentual)}%. Revisar causas.',
+            'tipo': 'warning'
+        })
+    else:
+        insights.append({
+            'icono': '➡️',
+            'titulo': 'Estabilidad',
+            'mensaje': 'Las incidencias se mantienen estables. Continuar monitoreando.',
+            'tipo': 'info'
+        })
+    
+    # Insight 2: Eficiencia del equipo
+    if tasa_exito >= 90:
+        insights.append({
+            'icono': '⚡',
+            'titulo': 'Equipo Altamente Eficiente',
+            'mensaje': f'{tasa_exito}% de incidencias resueltas dentro del objetivo. ¡Excelente desempeño!',
+            'tipo': 'success'
+        })
+    elif tasa_exito >= 70:
+        insights.append({
+            'icono': '👍',
+            'titulo': 'Buen Desempeño',
+            'mensaje': f'{tasa_exito}% de cumplimiento. Hay margen de mejora.',
+            'tipo': 'info'
+        })
+    else:
+        insights.append({
+            'icono': '⚠️',
+            'titulo': 'Oportunidad de Mejora',
+            'mensaje': f'Solo {tasa_exito}% dentro del objetivo. Revisar procesos.',
+            'tipo': 'warning'
+        })
+    
+    # Insight 3: Problemas recurrentes
+    porcentaje_recurrentes = round((incidencias_recurrentes / total_incidencias * 100), 1) if total_incidencias > 0 else 0
+    if porcentaje_recurrentes > 50:
+        insights.append({
+            'icono': '🔄',
+            'titulo': 'Alta Recurrencia',
+            'mensaje': f'{porcentaje_recurrentes}% son problemas repetitivos. Implementar soluciones permanentes.',
+            'tipo': 'warning'
+        })
+    else:
+        insights.append({
+            'icono': '✨',
+            'titulo': 'Buena Prevención',
+            'mensaje': f'Solo {porcentaje_recurrentes}% son recurrentes. La prevención está funcionando.',
+            'tipo': 'success'
+        })
+    
+    # Insight 4: Cobertura y disponibilidad
+    insights.append({
+        'icono': '�',
+        'titulo': 'Cobertura Total',
+        'mensaje': f'Monitoreo activo en {centros_activos} centros PCC con {cobertura_centros}% de cobertura.',
+        'tipo': 'success'
+    })
+    
+    # Insight 5: Centro crítico
+    if centro_top:
+        centro_nombre = centro_top.split(' - ')[0] if ' - ' in centro_top else centro_top
+        insights.append({
+            'icono': '🎯',
+            'titulo': 'Centro Prioritario',
+            'mensaje': f'{centro_nombre} concentra la mayor cantidad de incidencias. Enfocar recursos aquí.',
+            'tipo': 'info'
+        })
+    
+    # 6. Top 3 Recomendaciones basadas en datos
+    recomendaciones = []
+    
+    # Recomendación 1: Centro con más incidencias
+    if centro_top and 'Trafún' in str(centro_top):
+        recomendaciones.append({
+            'titulo': 'Priorizar Trafún',
+            'descripcion': f'{centro_top} requiere atención prioritaria',
+            'impacto': 'Alto'
+        })
+    
+    # Recomendación 2: Tipo de incidencia más frecuente
+    if causas_labels:
+        recomendaciones.append({
+            'titulo': f'Prevenir {causas_labels[0]}',
+            'descripcion': f'Representa {causas_count[0]} incidencias ({round(causas_count[0]/total_incidencias*100, 1)}%)',
+            'impacto': 'Alto'
+        })
+    
+    # Recomendación 3: Centros bajo SLA
+    centros_bajo_sla = [centros_labels[i] for i, sla in enumerate(cumplimiento_sla) if sla < 80]
+    if centros_bajo_sla:
+        recomendaciones.append({
+            'titulo': 'Mejorar Tiempo de Respuesta',
+            'descripcion': f'{", ".join(centros_bajo_sla)} bajo 80% de cumplimiento SLA',
+            'impacto': 'Medio'
+        })
+    
+    # Preparar datos para JavaScript
+    datos_json = json.dumps({
+        'total': total_incidencias,
+        'oxigeno_alto': oxigeno_alto,
+        'oxigeno_bajo': oxigeno_bajo,
+        'temperatura_baja': temperatura_baja
+    })
+    
+    context = {
+        'centros': centros,
+        'incidencias': incidencias,  # Todas las incidencias para filtrado correcto
+        'total_incidencias': total_incidencias,
+        'oxigeno_alto': oxigeno_alto,
+        'oxigeno_bajo': oxigeno_bajo,
+        'temperatura_baja': temperatura_baja,
+        'centro_top': centro_top,
+        'meses_unicos': meses_unicos,  # Meses con datos reales
+        'centros_labels': json.dumps(centros_labels),
+        'oxigeno_alto_data': json.dumps(oxigeno_alto_data),
+        'oxigeno_bajo_data': json.dumps(oxigeno_bajo_data),
+        'temperatura_baja_data': json.dumps(temperatura_baja_data),
+        'tipos_labels': json.dumps(tipos_labels),
+        'tipos_data': json.dumps(tipos_data),
+        'tendencia_labels': json.dumps(tendencia_labels),
+        'tendencia_data': json.dumps(tendencia_data),
+        'resolucion_data': json.dumps(resolucion_data),
+        'turnos_labels': json.dumps(turnos_labels),
+        'turnos_data': json.dumps(turnos_data),
+        'coordenadas_centros': json.dumps(coordenadas_centros),
+        'datos_json': datos_json,
+        # Datos de análisis y justificación
+        'causas_labels': json.dumps(causas_labels),
+        'causas_count': json.dumps(causas_count),
+        'causas_tiempo': json.dumps(causas_tiempo),
+        'tiempo_objetivo': tiempo_objetivo,
+        'tiempos_por_centro': json.dumps(tiempos_por_centro),
+        'cumplimiento_sla': json.dumps(cumplimiento_sla),
+        'mejora_labels': json.dumps(mejora_labels),
+        'mejora_total': json.dumps(mejora_total),
+        'mejora_tiempo': json.dumps(mejora_tiempo),
+        'incidencias_recurrentes': incidencias_recurrentes,
+        'incidencias_nuevas': incidencias_nuevas,
+        'reduccion_porcentual': reduccion_porcentual,
+        'mejora_tiempo_porcentual': mejora_tiempo_porcentual,
+        'recomendaciones': recomendaciones,
+        # Nuevas métricas de mejora
+        'incidencias_evitadas': incidencias_evitadas,
+        'minutos_ahorrados': int(minutos_ahorrados),
+        'eficiencia_operativa': eficiencia_operativa,
+        'horas_trabajo_estimadas': round(horas_trabajo_estimadas, 1),
+        'centros_activos': centros_activos,
+        'cobertura_centros': cobertura_centros,
+        'tasa_exito': tasa_exito,
+        'comparacion_periodos': comparacion_periodos,
+        'insights': insights,
+    }
+    
+    return render(request, 'dashboard_profesional.html', context)

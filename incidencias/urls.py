@@ -23,6 +23,7 @@ urlpatterns = [
     # 5. OTRAS VISTAS (Reporte y Dashboard)
     path('reporte/', views.vista_reporte, name='reporte'),
     path('dashboard/', views.vista_dashboard, name='dashboard'),
+    path('dashboard/profesional/', views.dashboard_profesional, name='dashboard_profesional'),
     
     # 6. CONTROL DIARIO SANTA JUANA
     path('control-diario/santa-juana/', views.vista_control_diario_santa_juana, name='control_diario_santa_juana'),
