@@ -4,8 +4,11 @@ from django.urls import path
 from . import views 
 
 urlpatterns = [
-    # 1. RUTA DE INICIO: Ahora apunta al selector
-    path('', views.vista_selector_centro, name='home'), 
+    # 0. LANDING PAGE: Página de bienvenida pública con carrusel
+    path('', views.vista_landing, name='landing'),
+    
+    # 1. RUTA DE INICIO (Panel Principal después del login)
+    path('panel/', views.vista_selector_centro, name='home'), 
     
     # 2. RUTAS DEL FORMULARIO PCC
     # Ruta para "crear" (apunta a la vista renombrada)
@@ -22,6 +25,7 @@ urlpatterns = [
     
     # 5. OTRAS VISTAS (Reporte y Dashboard)
     path('reporte/', views.vista_reporte, name='reporte'),
+    path('reporte-santa-juana/', views.vista_reporte_santa_juana, name='reporte_santa_juana'),
     path('dashboard/', views.vista_dashboard, name='dashboard'),
     path('dashboard/profesional/', views.dashboard_profesional, name='dashboard_profesional'),
     
@@ -49,4 +53,31 @@ urlpatterns = [
     
     # 11. CONSULTA DE REPORTES DE CÁMARAS
     path('consulta-reportes-camaras/', views.vista_consulta_reportes_camaras, name='consulta_reportes_camaras'),
+    
+    # 12. SISTEMA DE MONITOREO DE SENSORES (IDEAL CONTROL)
+    path('monitoreo-sensores/', views.vista_monitoreo_sensores, name='monitoreo_sensores'),
+    path('consulta-sensores/', views.vista_consulta_sensores, name='consulta_sensores'),
+    path('dashboard-sensores/', views.dashboard_sensores, name='dashboard_sensores'),
+    path('api/sensores/sistemas/', views.api_obtener_sistemas, name='api_obtener_sistemas'),
+    path('api/sensores/sensores/', views.api_obtener_sensores, name='api_obtener_sensores'),
+    path('api/sensores/guardar/', views.api_guardar_monitoreo, name='api_guardar_monitoreo'),
+    path('api/sensores/reporte/', views.api_obtener_reporte_sensores, name='api_obtener_reporte_sensores'),
+    path('api/sensores/listar/', views.api_listar_reportes_sensores, name='api_listar_reportes_sensores'),
+    path('api/sensores/detalle/', views.api_detalle_reporte_sensores, name='api_detalle_reporte_sensores'),
+    path('api/sensores/eliminar/<int:pk>/', views.api_eliminar_registro_sensor, name='api_eliminar_registro_sensor'),
+    path('api/sensores/actualizar/<int:pk>/', views.api_actualizar_registro_sensor, name='api_actualizar_registro_sensor'),
+    path('api/sensores/eliminar-reporte/', views.api_eliminar_reporte_completo, name='api_eliminar_reporte_completo'),
+    
+    # 13. SISTEMA DE REPORTES DE PLATAFORMA (INNOVEX/SINPLANT/IDEAL CONTROL)
+    path('reporte-plataformas/', views.vista_reporte_plataformas, name='reporte_plataformas'),
+    path('reporte-plataformas/editar/<int:pk>/', views.vista_editar_reporte_plataforma, name='editar_reporte_plataforma'),
+    path('consulta-plataformas/', views.vista_consulta_plataformas, name='consulta_plataformas'),
+    path('estadisticas-plataformas/', views.vista_estadisticas_plataformas, name='estadisticas_plataformas'),
+    path('api/plataformas/guardar/', views.api_guardar_reporte_plataforma, name='api_guardar_reporte_plataforma'),
+    path('api/plataformas/eliminar/<int:pk>/', views.api_eliminar_reporte_plataforma, name='api_eliminar_reporte_plataforma'),
+    path('api/plataformas/estadisticas/', views.api_estadisticas_plataformas, name='api_estadisticas_plataformas'),
+    path('plataformas/pdf/<int:pk>/', views.generar_pdf_plataforma, name='generar_pdf_plataforma'),
+    
+    # 14. REPORTE GENERAL CONSOLIDADO (PCC + SENSORES)
+    path('reporte-general/pdf/', views.generar_reporte_general_pdf, name='generar_reporte_general_pdf'),
 ]

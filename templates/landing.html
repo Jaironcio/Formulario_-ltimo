@@ -1,0 +1,503 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Monitoreo y Control - Cermaq Chile</title>
+    <link rel="icon" type="image/png" href="{% static 'imagenes/logo-pestaña.png' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow-x: hidden;
+            background: #0a1929;
+        }
+
+        /* Header Profesional */
+        .header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(10, 25, 41, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-section img {
+            height: 50px;
+        }
+
+        .logo-text {
+            color: white;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .logo-text .highlight {
+            color: #00b4d8;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .btn-login {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 180, 216, 0.3);
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 180, 216, 0.5);
+        }
+
+        /* Carrusel Hero */
+        .hero-carousel {
+            position: relative;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .carousel-slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 1.5s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .carousel-slide.active {
+            opacity: 1;
+        }
+
+        .slide-background {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .slide-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            color: white;
+            max-width: 900px;
+            padding: 0 20px;
+            animation: slideUp 1s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slide-content h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .slide-content p {
+            font-size: 1.4em;
+            margin-bottom: 40px;
+            text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.5);
+            opacity: 0.9;
+        }
+
+        .slide-icon {
+            font-size: 5em;
+            margin-bottom: 30px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* Indicadores del Carrusel */
+        .carousel-indicators {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .indicator.active {
+            background: white;
+            width: 40px;
+            border-radius: 6px;
+        }
+
+        /* Sección de Características */
+        .features-section {
+            padding: 100px 50px;
+            background: linear-gradient(180deg, #0a1929 0%, #1a2f45 100%);
+        }
+
+        .features-title {
+            text-align: center;
+            color: white;
+            font-size: 2.5em;
+            margin-bottom: 60px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 35px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0, 180, 216, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            color: #00b4d8;
+        }
+
+        .feature-card h3 {
+            color: white;
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card p {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1em;
+            line-height: 1.6;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            padding: 80px 50px;
+            background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+            text-align: center;
+        }
+
+        .cta-section h2 {
+            color: white;
+            font-size: 2.5em;
+            margin-bottom: 25px;
+        }
+
+        .cta-section p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.3em;
+            margin-bottom: 35px;
+        }
+
+        .btn-cta {
+            padding: 18px 45px;
+            background: white;
+            color: #0077b6;
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: 700;
+            transition: all 0.3s;
+            display: inline-block;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-cta:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Footer */
+        .footer {
+            background: #0a1929;
+            padding: 40px 50px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .footer p {
+            margin-bottom: 10px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 15px 20px;
+            }
+            
+            .slide-content h1 {
+                font-size: 2em;
+            }
+            
+            .slide-content p {
+                font-size: 1em;
+            }
+
+            .slide-icon {
+                font-size: 3em;
+            }
+
+            .features-section {
+                padding: 60px 20px;
+            }
+
+            .features-title {
+                font-size: 1.8em;
+            }
+
+            .cta-section {
+                padding: 60px 20px;
+            }
+
+            .cta-section h2 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- Header -->
+    <header class="header">
+        <div class="logo-section">
+            <img src="{% static 'imagenes/logo-pestaña.png' %}" alt="Cermaq Logo">
+            <div class="logo-text">
+                <span class="highlight">CERMAQ</span> Control
+            </div>
+        </div>
+        <div class="header-right">
+            <a href="{% url 'login' %}" class="btn-login">
+                <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+            </a>
+        </div>
+    </header>
+
+    <!-- Hero Carousel -->
+    <section class="hero-carousel">
+        <!-- Slide 1: Monitoreo en Tiempo Real -->
+        <div class="carousel-slide active">
+            <div class="slide-background" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+            <div class="slide-content">
+                <div class="slide-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h1>Monitoreo en Tiempo Real</h1>
+                <p>Control total de parámetros críticos en todas tus pisciculturas</p>
+            </div>
+        </div>
+
+        <!-- Slide 2: Gestión de Incidencias -->
+        <div class="carousel-slide">
+            <div class="slide-background" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+            <div class="slide-content">
+                <div class="slide-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h1>Gestión de Incidencias</h1>
+                <p>Registra y resuelve problemas operacionales de forma eficiente</p>
+            </div>
+        </div>
+
+        <!-- Slide 3: Reportes Inteligentes -->
+        <div class="carousel-slide">
+            <div class="slide-background" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+            <div class="slide-content">
+                <div class="slide-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <h1>Reportes Inteligentes</h1>
+                <p>Análisis y dashboards profesionales para toma de decisiones</p>
+            </div>
+        </div>
+
+        <!-- Slide 4: Sistema Ideal Control -->
+        <div class="carousel-slide">
+            <div class="slide-background" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
+            <div class="slide-content">
+                <div class="slide-icon">
+                    <i class="fas fa-microchip"></i>
+                </div>
+                <h1>Integración Ideal Control</h1>
+                <p>Monitoreo de sensores y alertas automáticas 24/7</p>
+            </div>
+        </div>
+
+        <!-- Indicadores -->
+        <div class="carousel-indicators">
+            <div class="indicator active" data-slide="0"></div>
+            <div class="indicator" data-slide="1"></div>
+            <div class="indicator" data-slide="2"></div>
+            <div class="indicator" data-slide="3"></div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section">
+        <h2 class="features-title">Funcionalidades del Sistema</h2>
+        <div class="features-grid">
+            
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-water"></i>
+                </div>
+                <h3>Control de Parámetros</h3>
+                <p>Oxígeno, temperatura, conductividad y turbidez en tiempo real</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-bell"></i>
+                </div>
+                <h3>Alertas Automáticas</h3>
+                <p>Notificaciones instantáneas ante valores fuera de rango</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-database"></i>
+                </div>
+                <h3>Historial Completo</h3>
+                <p>Registro detallado de todas las incidencias y mediciones</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+                <h3>Dashboards Ejecutivos</h3>
+                <p>Visualización de KPIs y tendencias operacionales</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-file-pdf"></i>
+                </div>
+                <h3>Reportes PDF</h3>
+                <p>Generación automática de reportes profesionales</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h3>Multi-Centro</h3>
+                <p>Gestión centralizada de todas las pisciculturas</p>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <h2>¿Listo para optimizar tus operaciones?</h2>
+        <p>Accede al sistema y comienza a monitorear tus centros ahora</p>
+        <a href="{% url 'login' %}" class="btn-cta">
+            <i class="fas fa-rocket"></i> Ingresar al Sistema
+        </a>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2026 Cermaq Chile - Sistema de Monitoreo y Control</p>
+        <p>Desarrollado para la excelencia operacional</p>
+    </footer>
+
+    <script>
+        // Carrusel automático
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.carousel-slide');
+        const indicators = document.querySelectorAll('.indicator');
+        const totalSlides = slides.length;
+
+        function showSlide(index) {
+            slides.forEach(slide => slide.classList.remove('active'));
+            indicators.forEach(ind => ind.classList.remove('active'));
+            
+            slides[index].classList.add('active');
+            indicators[index].classList.add('active');
+        }
+
+        function nextSlide() {
+            currentSlide = (currentSlide + 1) % totalSlides;
+            showSlide(currentSlide);
+        }
+
+        // Auto-avance cada 5 segundos
+        setInterval(nextSlide, 5000);
+
+        // Click en indicadores
+        indicators.forEach((indicator, index) => {
+            indicator.addEventListener('click', () => {
+                currentSlide = index;
+                showSlide(currentSlide);
+            });
+        });
+    </script>
+
+</body>
+</html>

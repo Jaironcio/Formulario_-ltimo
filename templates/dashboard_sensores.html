@@ -1,0 +1,478 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Sensores - Ideal Control</title>
+    <link rel="stylesheet" href="{% static 'css/formulario.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a8a8a 0%, #17a2b8 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #17a2b8;
+        }
+
+        .dashboard-header h1 {
+            color: #17a2b8;
+            font-size: 36px;
+            margin: 0 0 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .dashboard-header p {
+            color: #666;
+            font-size: 16px;
+            margin: 0;
+        }
+
+        .filters-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 20px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filter-group label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .filter-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .filter-group select:focus {
+            outline: none;
+            border-color: #17a2b8;
+        }
+
+        .btn-filter {
+            padding: 10px 30px;
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(23, 162, 184, 0.3);
+        }
+
+        .btn-filter:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(23, 162, 184, 0.4);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-left: 5px solid;
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card.primary { border-left-color: #17a2b8; }
+        .stat-card.danger { border-left-color: #dc3545; }
+        .stat-card.success { border-left-color: #28a745; }
+        .stat-card.warning { border-left-color: #ffc107; }
+
+        .stat-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #333;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .chart-card h3 {
+            color: #17a2b8;
+            margin: 0 0 20px 0;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .kpi-table {
+            width: 100%;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .kpi-table h3 {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+            padding: 20px;
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .kpi-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .kpi-table th {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .kpi-table td {
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .kpi-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge-cumple {
+            background: #28a745;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-no-cumple {
+            background: #dc3545;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .back-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .back-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(220, 53, 69, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <a href="{% url 'consulta_sensores' %}" class="back-button">← Volver a Reportes</a>
+
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <h1>
+                <span>📊</span>
+                Dashboard de Sensores - Ideal Control
+            </h1>
+            <p>Métricas de monitoreo y rendimiento del sistema de sensores</p>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filters-section">
+            <div class="filter-group">
+                <label>Filtrar por período:</label>
+                <select id="periodo-filter">
+                    <option value="all" {% if filtros_aplicados.periodo == 'all' or not filtros_aplicados.periodo %}selected{% endif %}>Todo el tiempo</option>
+                    <option value="week" {% if filtros_aplicados.periodo == 'week' %}selected{% endif %}>Última semana</option>
+                    <option value="month" {% if filtros_aplicados.periodo == 'month' %}selected{% endif %}>Último mes</option>
+                    <option value="quarter" {% if filtros_aplicados.periodo == 'quarter' %}selected{% endif %}>Último trimestre</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Centro:</label>
+                <select id="centro-filter">
+                    <option value="">Todos los centros</option>
+                    {% for centro in centros %}
+                        <option value="{{ centro.id }}" {% if filtros_aplicados.centro == centro.id|stringformat:"s" %}selected{% endif %}>
+                            {{ centro.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="btn-filter" onclick="actualizarDashboard()">🔄 Actualizar Dashboard</button>
+        </div>
+
+        <!-- Estadísticas Principales -->
+        <div class="stats-grid">
+            <div class="stat-card primary">
+                <div class="stat-icon">📋</div>
+                <div class="stat-value">{{ total_registros }}</div>
+                <div class="stat-label">Total Registros</div>
+            </div>
+            <div class="stat-card danger">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-value">{{ total_incidencias }}</div>
+                <div class="stat-label">Incidencias (Alto/Bajo)</div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-icon">✅</div>
+                <div class="stat-value">{{ total_normales }}</div>
+                <div class="stat-label">Sensores Normales</div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-icon">📈</div>
+                <div class="stat-value">{{ porcentaje_cumplimiento }}%</div>
+                <div class="stat-label">Cumplimiento</div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>📊 Incidencias por Centro</h3>
+                <canvas id="chartCentro"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>📈 Tendencia Temporal</h3>
+                <canvas id="chartTendencia"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>🎯 Distribución por Estado</h3>
+                <canvas id="chartEstados"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>⚙️ Incidencias por Sistema</h3>
+                <canvas id="chartSistema"></canvas>
+            </div>
+        </div>
+
+        <!-- Tabla KPI por Centro -->
+        <div class="kpi-table">
+            <h3>📊 KPI por Centro</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Centro</th>
+                        <th>Total Sensores</th>
+                        <th>Normales</th>
+                        <th>Incidencias</th>
+                        <th>% Cumplimiento</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for kpi in kpi_data %}
+                    <tr>
+                        <td><strong>{{ kpi.centro_nombre }}</strong></td>
+                        <td>{{ kpi.total_sensores }}</td>
+                        <td style="color: #28a745;">{{ kpi.normales }}</td>
+                        <td style="color: #dc3545;">{{ kpi.incidencias }}</td>
+                        <td><strong>{{ kpi.porcentaje }}%</strong></td>
+                        <td>
+                            {% if kpi.cumple_meta %}
+                                <span class="badge-cumple">✓ Cumple</span>
+                            {% else %}
+                                <span class="badge-no-cumple">✗ No Cumple</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Función para actualizar dashboard
+        function actualizarDashboard() {
+            const periodo = document.getElementById('periodo-filter').value;
+            const centro = document.getElementById('centro-filter').value;
+            let url = '{% url "dashboard_sensores" %}?';
+            if (periodo) url += `periodo=${periodo}&`;
+            if (centro) url += `centro=${centro}&`;
+            window.location.href = url;
+        }
+
+        // Gráfico: Incidencias por Centro
+        const ctxCentro = document.getElementById('chartCentro').getContext('2d');
+        new Chart(ctxCentro, {
+            type: 'bar',
+            data: {
+                labels: {{ chart_centro_labels_json|safe }},
+                datasets: [{
+                    label: 'Incidencias',
+                    data: {{ chart_centro_counts_json|safe }},
+                    backgroundColor: 'rgba(23, 162, 184, 0.7)',
+                    borderColor: 'rgba(23, 162, 184, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // Gráfico: Tendencia Temporal
+        const ctxTendencia = document.getElementById('chartTendencia').getContext('2d');
+        new Chart(ctxTendencia, {
+            type: 'line',
+            data: {
+                labels: {{ chart_tendencia_labels_json|safe }},
+                datasets: [{
+                    label: 'Incidencias',
+                    data: {{ chart_tendencia_data_json|safe }},
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // Gráfico: Distribución por Estado
+        const ctxEstados = document.getElementById('chartEstados').getContext('2d');
+        new Chart(ctxEstados, {
+            type: 'doughnut',
+            data: {
+                labels: ['Normal', 'Alto', 'Bajo'],
+                datasets: [{
+                    data: {{ chart_estados_data_json|safe }},
+                    backgroundColor: [
+                        'rgba(40, 167, 69, 0.7)',
+                        'rgba(220, 53, 69, 0.7)',
+                        'rgba(255, 193, 7, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(40, 167, 69, 1)',
+                        'rgba(220, 53, 69, 1)',
+                        'rgba(255, 193, 7, 1)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true
+            }
+        });
+
+        // Gráfico: Incidencias por Sistema
+        const ctxSistema = document.getElementById('chartSistema').getContext('2d');
+        new Chart(ctxSistema, {
+            type: 'bar',
+            data: {
+                labels: {{ chart_sistema_labels_json|safe }},
+                datasets: [{
+                    label: 'Incidencias',
+                    data: {{ chart_sistema_data_json|safe }},
+                    backgroundColor: 'rgba(111, 66, 193, 0.7)',
+                    borderColor: 'rgba(111, 66, 193, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                indexAxis: 'y',
+                scales: {
+                    x: { beginAtZero: true }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

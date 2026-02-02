@@ -1,0 +1,55 @@
+# Generated migration for sensor monitoring system
+
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('incidencias', '0006_alter_reportecamaras_collin_descripcion_and_more'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='SensorConfig',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('sistema', models.CharField(max_length=100)),
+                ('equipo', models.CharField(max_length=200)),
+                ('tipo_medicion', models.CharField(max_length=100)),
+                ('limite_min', models.CharField(blank=True, max_length=50)),
+                ('limite_max', models.CharField(blank=True, max_length=50)),
+                ('activo', models.BooleanField(default=True)),
+                ('orden', models.IntegerField(default=0)),
+                ('centro', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='sensores', to='incidencias.centro')),
+            ],
+            options={
+                'verbose_name': 'Configuración de Sensor',
+                'verbose_name_plural': 'Configuraciones de Sensores',
+                'ordering': ['centro', 'sistema', 'orden', 'equipo'],
+                'unique_together': {('centro', 'sistema', 'equipo')},
+            },
+        ),
+        migrations.CreateModel(
+            name='MonitoreoSensores',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('fecha', models.DateField()),
+                ('turno', models.CharField(choices=[('MAÑANA', 'Mañana'), ('TARDE', 'Tarde'), ('NOCHE', 'Noche')], max_length=20)),
+                ('estado', models.CharField(choices=[('NORMAL', 'Normal'), ('ALTO', 'Alto - Sobre límite'), ('BAJO', 'Bajo - Bajo límite'), ('N/A', 'No aplica')], default='NORMAL', max_length=20)),
+                ('observacion', models.TextField(blank=True)),
+                ('responsable', models.CharField(max_length=100)),
+                ('creado_en', models.DateTimeField(auto_now_add=True)),
+                ('actualizado_en', models.DateTimeField(auto_now=True)),
+                ('centro', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='incidencias.centro')),
+                ('sensor', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='incidencias.sensorconfig')),
+            ],
+            options={
+                'verbose_name': 'Monitoreo de Sensor',
+                'verbose_name_plural': 'Monitoreos de Sensores',
+                'ordering': ['-fecha', 'turno', 'centro', 'sensor'],
+                'unique_together': {('fecha', 'turno', 'centro', 'sensor')},
+            },
+        ),
+    ]

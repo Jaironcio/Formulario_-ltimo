@@ -1,0 +1,170 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block title %}Consulta Plataformas{% endblock %}
+{% block page_title %}Consulta de Reportes de Plataforma{% endblock %}
+{% block page_subtitle %}Historial de fallas INNOVEX, SINPLANT e IDEAL CONTROL{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'css/formulario.css' %}">
+<style>
+    .page-layout, .sidebar-actions { display: none !important; }
+    .content-wrapper { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+    .filters-section { background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px; }
+    .filter-group { display: inline-block; margin-right: 15px; margin-bottom: 10px; }
+    .filter-group label { display: block; font-weight: 600; margin-bottom: 5px; color: #333; font-size: 0.9em; }
+    .filter-group input, .filter-group select { padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95em; }
+    .btn-filter { padding: 10px 20px; background: linear-gradient(135deg, #00b4d8, #0077b6); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 20px; }
+    .btn-filter:hover { box-shadow: 0 4px 15px rgba(0,180,216,0.4); }
+    .btn-reset { padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 20px; text-decoration: none; display: inline-block; margin-left: 10px; }
+    .reportes-table { width: 100%; overflow-x: auto; }
+    .reportes-table table { width: 100%; border-collapse: collapse; min-width: 900px; }
+    .reportes-table th { background: linear-gradient(135deg, #1e3a5f 0%, #0a1929 100%); color: white; padding: 15px 12px; text-align: left; font-weight: 600; font-size: 0.85em; }
+    .reportes-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 0.9em; }
+    .reportes-table tr:hover { background: #f8f9fa; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8em; font-weight: 600; }
+    .badge-innovex { background: #e3f2fd; color: #1976d2; }
+    .badge-sinplant { background: #f3e5f5; color: #7b1fa2; }
+    .badge-ideal-control { background: #e0f7fa; color: #00838f; }
+    .badge-riesgo { background: #ffebee; color: #c62828; }
+    .badge-ok { background: #e8f5e9; color: #2e7d32; }
+    .btn-delete { padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8em; }
+    .btn-delete:hover { background: #c82333; }
+    .btn-pdf { padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8em; text-decoration: none; display: inline-block; margin-right: 5px; }
+    .btn-pdf:hover { background: #218838; }
+    .pagination { text-align: center; margin-top: 20px; }
+    .pagination a { display: inline-block; padding: 8px 12px; margin: 0 3px; background: #f8f9fa; color: #333; text-decoration: none; border-radius: 6px; }
+    .pagination a:hover { background: #00b4d8; color: white; }
+    .pagination .current { background: #00b4d8; color: white; padding: 8px 15px; border-radius: 6px; }
+</style>
+{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'estadisticas_plataformas' %}" class="header-btn">
+    <i class="fas fa-chart-bar"></i> Estadísticas
+</a>
+<a href="{% url 'reporte_plataformas' %}" class="header-btn primary">
+    <i class="fas fa-plus"></i> Nuevo Reporte
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    {% csrf_token %}
+    
+    <div class="filters-section">
+        <form method="get" action="{% url 'consulta_plataformas' %}">
+            <div class="filter-group">
+                <label for="fecha">Fecha:</label>
+                <input type="date" id="fecha" name="fecha" value="{{ fecha_filtro }}">
+            </div>
+            <div class="filter-group">
+                <label for="plataforma">Plataforma:</label>
+                <select id="plataforma" name="plataforma">
+                    <option value="">Todas</option>
+                    <option value="INNOVEX" {% if plataforma_filtro == 'INNOVEX' %}selected{% endif %}>INNOVEX</option>
+                    <option value="SINPLANT" {% if plataforma_filtro == 'SINPLANT' %}selected{% endif %}>SINPLANT</option>
+                    <option value="IDEAL CONTROL" {% if plataforma_filtro == 'IDEAL CONTROL' %}selected{% endif %}>IDEAL CONTROL</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="centro">Centro:</label>
+                <select id="centro" name="centro">
+                    <option value="">Todos</option>
+                    {% for c in centros %}<option value="{{ c.id }}" {% if centro_filtro == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn-filter"><i class="fas fa-filter"></i> Filtrar</button>
+            <a href="{% url 'consulta_plataformas' %}" class="btn-reset"><i class="fas fa-undo"></i> Limpiar</a>
+        </form>
+    </div>
+
+    <div class="reportes-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha/Hora</th>
+                    <th>Turno</th>
+                    <th>Centro</th>
+                    <th>Plataforma</th>
+                    <th>Sistema</th>
+                    <th>Tiempo (min)</th>
+                    <th>Proveedor</th>
+                    <th>Riesgo</th>
+                    <th>Responsable</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for reporte in reportes %}
+                <tr>
+                    <td>{{ reporte.fecha_hora|date:"d/m/Y H:i" }}</td>
+                    <td>{{ reporte.turno }}</td>
+                    <td>{{ reporte.centro.nombre }}</td>
+                    <td><span class="badge {% if reporte.plataforma == 'INNOVEX' %}badge-innovex{% elif reporte.plataforma == 'SINPLANT' %}badge-sinplant{% else %}badge-ideal-control{% endif %}">{{ reporte.plataforma }}</span></td>
+                    <td>{{ reporte.sistema_fallando }}</td>
+                    <td style="text-align: center; font-weight: 600;">{{ reporte.tiempo_fuera_servicio }} {% if reporte.unidad_tiempo == 'dias' %}días{% else %}min{% endif %}</td>
+                    <td style="text-align: center;">{% if reporte.contacto_proveedor == 'si' %}✅{% elif reporte.contacto_proveedor == 'sin_respuesta' %}⚠️{% else %}❌{% endif %}</td>
+                    <td>{% if reporte.riesgo_peces or reporte.perdida_economica %}<span class="badge badge-riesgo">⚠️</span>{% else %}<span class="badge badge-ok">✓</span>{% endif %}</td>
+                    <td>{{ reporte.responsable }}</td>
+                    <td>
+                        <a href="{% url 'generar_pdf_plataforma' reporte.id %}" class="btn-pdf" target="_blank">📄</a>
+                        <a href="{% url 'editar_reporte_plataforma' reporte.id %}" class="btn-pdf" style="background: #ffc107;">✏️</a>
+                        <button onclick="eliminarReporte({{ reporte.id }})" class="btn-delete">🗑️</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="10" style="text-align: center; padding: 40px; color: #999;">No se encontraron reportes.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if reportes.has_other_pages %}
+    <div class="pagination">
+        {% if reportes.has_previous %}
+        <a href="?page=1{% if fecha_filtro %}&fecha={{ fecha_filtro }}{% endif %}{% if plataforma_filtro %}&plataforma={{ plataforma_filtro }}{% endif %}{% if centro_filtro %}&centro={{ centro_filtro }}{% endif %}">« Primera</a>
+        <a href="?page={{ reportes.previous_page_number }}{% if fecha_filtro %}&fecha={{ fecha_filtro }}{% endif %}{% if plataforma_filtro %}&plataforma={{ plataforma_filtro }}{% endif %}{% if centro_filtro %}&centro={{ centro_filtro }}{% endif %}">‹ Anterior</a>
+        {% endif %}
+        <span class="current">Página {{ reportes.number }} de {{ reportes.paginator.num_pages }}</span>
+        {% if reportes.has_next %}
+        <a href="?page={{ reportes.next_page_number }}{% if fecha_filtro %}&fecha={{ fecha_filtro }}{% endif %}{% if plataforma_filtro %}&plataforma={{ plataforma_filtro }}{% endif %}{% if centro_filtro %}&centro={{ centro_filtro }}{% endif %}">Siguiente ›</a>
+        <a href="?page={{ reportes.paginator.num_pages }}{% if fecha_filtro %}&fecha={{ fecha_filtro }}{% endif %}{% if plataforma_filtro %}&plataforma={{ plataforma_filtro }}{% endif %}{% if centro_filtro %}&centro={{ centro_filtro }}{% endif %}">Última »</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function eliminarReporte(reporteId) {
+    if (!confirm('¿Eliminar este reporte de plataforma?\n\nEsta acción no se puede deshacer.')) return;
+    fetch(`/api/plataformas/eliminar/${reporteId}/`, {
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) { alert('Reporte eliminado'); location.reload(); }
+        else { alert('Error: ' + data.message); }
+    })
+    .catch(error => { console.error('Error:', error); alert('Error al eliminar'); });
+}
+</script>
+{% endblock %}

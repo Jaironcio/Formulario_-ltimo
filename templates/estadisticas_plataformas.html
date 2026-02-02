@@ -1,0 +1,611 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block title %}Estadísticas Plataformas{% endblock %}
+{% block page_title %}Estadísticas de Fallas de Plataforma{% endblock %}
+{% block page_subtitle %}Análisis y visualización de datos de fallas{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'css/formulario.css' %}">
+<style>
+    .page-layout, .sidebar-actions { display: none !important; }
+    .content-wrapper { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+    
+    .filters-section {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        border-left: 4px solid #00b4d8;
+    }
+    
+    .filter-group {
+        display: inline-block;
+        margin-right: 15px;
+        margin-bottom: 10px;
+    }
+    
+    .filter-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #333;
+        font-size: 0.9em;
+    }
+    
+    .filter-group input,
+    .filter-group select {
+        padding: 10px 14px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 0.95em;
+        background: white;
+    }
+    
+    .btn-filter {
+        padding: 10px 20px;
+        background: linear-gradient(135deg, #00b4d8, #0077b6);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        margin-top: 20px;
+    }
+    
+    .btn-filter:hover {
+        box-shadow: 0 4px 15px rgba(0,180,216,0.4);
+        transform: translateY(-2px);
+        transition: all 0.3s;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .stat-card h3 {
+        margin: 0 0 10px 0;
+        font-size: 0.9em;
+        opacity: 0.9;
+        font-weight: 500;
+    }
+    
+    .stat-card .value {
+        font-size: 2.5em;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+        gap: 25px;
+        margin-bottom: 30px;
+    }
+    
+    .chart-container {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    
+    .chart-container h3 {
+        margin: 0 0 20px 0;
+        color: #1e3a5f;
+        font-size: 1.1em;
+        font-weight: 600;
+        border-bottom: 2px solid #00b4d8;
+        padding-bottom: 10px;
+    }
+    
+    .chart-wrapper {
+        position: relative;
+        height: 350px;
+    }
+    
+    .observaciones-list {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    
+    .observaciones-list h3 {
+        margin: 0 0 20px 0;
+        color: #1e3a5f;
+        font-size: 1.1em;
+        font-weight: 600;
+        border-bottom: 2px solid #00b4d8;
+        padding-bottom: 10px;
+    }
+    
+    .observacion-item {
+        padding: 12px;
+        margin-bottom: 10px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #00b4d8;
+    }
+    
+    .observacion-item .text {
+        font-size: 0.95em;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .observacion-item .count {
+        font-size: 0.85em;
+        color: #666;
+        font-weight: 600;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #999;
+    }
+</style>
+{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'consulta_plataformas' %}" class="header-btn">
+    <i class="fas fa-list"></i> Ver Reportes
+</a>
+<a href="{% url 'reporte_plataformas' %}" class="header-btn primary">
+    <i class="fas fa-plus"></i> Nuevo Reporte
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <div class="filters-section">
+        <div class="filter-group">
+            <label for="fechaInicio">Fecha Inicio:</label>
+            <input type="date" id="fechaInicio">
+        </div>
+        <div class="filter-group">
+            <label for="fechaFin">Fecha Fin:</label>
+            <input type="date" id="fechaFin">
+        </div>
+        <div class="filter-group">
+            <label for="plataforma">Plataforma:</label>
+            <select id="plataforma">
+                <option value="">Todas</option>
+                <option value="INNOVEX">INNOVEX</option>
+                <option value="SINPLANT">SINPLANT</option>
+                <option value="IDEAL CONTROL">IDEAL CONTROL</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="centro">Centro:</label>
+            <select id="centro">
+                <option value="">Todos</option>
+                {% for c in centros %}
+                <option value="{{ c.id }}">{{ c.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button onclick="cargarEstadisticas()" class="btn-filter">
+            <i class="fas fa-chart-bar"></i> Generar Estadísticas
+        </button>
+    </div>
+
+    <div id="loadingIndicator" class="loading" style="display: none;">
+        <i class="fas fa-spinner fa-spin fa-3x"></i>
+        <p>Cargando estadísticas...</p>
+    </div>
+
+    <div id="statsContent" style="display: none;">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total de Reportes</h3>
+                <p class="value" id="totalReportes">0</p>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h3>Fallas por Tipo</h3>
+                <div class="chart-wrapper">
+                    <canvas id="chartTipoFalla"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3>Fallas por Plataforma</h3>
+                <div class="chart-wrapper">
+                    <canvas id="chartPlataforma"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3>Fallas por Centro</h3>
+                <div class="chart-wrapper">
+                    <canvas id="chartCentro"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3>Tiempo Promedio Fuera de Servicio (minutos)</h3>
+                <div class="chart-wrapper">
+                    <canvas id="chartTiempoPromedio"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3>Razones de Caída Más Frecuentes</h3>
+                <div class="chart-wrapper">
+                    <canvas id="chartRazonesCaida"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="observaciones-list">
+            <h3>Detalle de Razones de Caída</h3>
+            <div id="observacionesContainer"></div>
+        </div>
+
+        <div class="observaciones-list" id="detalleIncidenciasContainer" style="display: none; margin-top: 30px;">
+            <h3 id="detalleIncidenciasTitulo">Detalle de Incidencias</h3>
+            <button onclick="cerrarDetalle()" style="float: right; margin-top: -35px; padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Cerrar</button>
+            <div id="detalleIncidenciasContenido" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+let charts = {};
+let datosCompletos = {};
+
+function cargarEstadisticas() {
+    const fechaInicio = document.getElementById('fechaInicio').value;
+    const fechaFin = document.getElementById('fechaFin').value;
+    const plataforma = document.getElementById('plataforma').value;
+    const centro = document.getElementById('centro').value;
+    
+    const params = new URLSearchParams();
+    if (fechaInicio) params.append('fecha_inicio', fechaInicio);
+    if (fechaFin) params.append('fecha_fin', fechaFin);
+    if (plataforma) params.append('plataforma', plataforma);
+    if (centro) params.append('centro', centro);
+    
+    document.getElementById('loadingIndicator').style.display = 'block';
+    document.getElementById('statsContent').style.display = 'none';
+    
+    fetch(`/api/plataformas/estadisticas/?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                datosCompletos = data;
+                mostrarEstadisticas(data);
+            } else {
+                alert('Error al cargar estadísticas: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cargar estadísticas');
+        })
+        .finally(() => {
+            document.getElementById('loadingIndicator').style.display = 'none';
+        });
+}
+
+function mostrarDetalleIncidencias(razon) {
+    const detalles = datosCompletos.detalles_por_razon[razon] || [];
+    const container = document.getElementById('detalleIncidenciasContainer');
+    const titulo = document.getElementById('detalleIncidenciasTitulo');
+    const contenido = document.getElementById('detalleIncidenciasContenido');
+    
+    titulo.textContent = `Detalle de Incidencias: ${razon} (${detalles.length})`;
+    
+    if (detalles.length === 0) {
+        contenido.innerHTML = '<p style="text-align: center; color: #999;">No hay incidencias para esta razón</p>';
+    } else {
+        let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
+        html += '<thead><tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">';
+        html += '<th style="padding: 12px; text-align: left;">Fecha/Hora</th>';
+        html += '<th style="padding: 12px; text-align: left;">Centro</th>';
+        html += '<th style="padding: 12px; text-align: left;">Plataforma</th>';
+        html += '<th style="padding: 12px; text-align: left;">Sistema</th>';
+        html += '<th style="padding: 12px; text-align: center;">Tiempo Fuera</th>';
+        html += '<th style="padding: 12px; text-align: left;">Responsable</th>';
+        html += '<th style="padding: 12px; text-align: left;">Observación</th>';
+        html += '<th style="padding: 12px; text-align: center;">PDF</th>';
+        html += '</tr></thead><tbody>';
+        
+        detalles.forEach(detalle => {
+            html += '<tr style="border-bottom: 1px solid #dee2e6;">';
+            html += `<td style="padding: 10px;">${detalle.fecha_hora}</td>`;
+            html += `<td style="padding: 10px;">${detalle.centro}</td>`;
+            html += `<td style="padding: 10px;"><span style="background: ${detalle.plataforma === 'INNOVEX' ? '#007bff' : detalle.plataforma === 'SINPLANT' ? '#28a745' : '#ffc107'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">${detalle.plataforma}</span></td>`;
+            html += `<td style="padding: 10px;">${detalle.sistema_fallando}</td>`;
+            html += `<td style="padding: 10px; text-align: center; font-weight: 600;">${detalle.tiempo_fuera}</td>`;
+            html += `<td style="padding: 10px;">${detalle.responsable}</td>`;
+            html += `<td style="padding: 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${detalle.observacion}">${detalle.observacion || '-'}</td>`;
+            html += `<td style="padding: 10px; text-align: center;"><a href="/plataformas/pdf/${detalle.id}/" target="_blank" style="background: #dc3545; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px;">📄 Ver</a></td>`;
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table>';
+        contenido.innerHTML = html;
+    }
+    
+    container.style.display = 'block';
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cerrarDetalle() {
+    document.getElementById('detalleIncidenciasContainer').style.display = 'none';
+}
+
+function mostrarEstadisticas(data) {
+    document.getElementById('statsContent').style.display = 'block';
+    document.getElementById('totalReportes').textContent = data.total_reportes;
+    
+    // Destruir gráficas anteriores
+    Object.values(charts).forEach(chart => chart.destroy());
+    charts = {};
+    
+    // Gráfica de fallas por tipo
+    const ctxTipo = document.getElementById('chartTipoFalla').getContext('2d');
+    charts.tipo = new Chart(ctxTipo, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(data.fallas_por_tipo),
+            datasets: [{
+                label: 'Cantidad de Fallas',
+                data: Object.values(data.fallas_por_tipo),
+                backgroundColor: 'rgba(0, 180, 216, 0.7)',
+                borderColor: 'rgba(0, 180, 216, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'end',
+                    formatter: (value) => value,
+                    color: '#333',
+                    font: {
+                        weight: 'bold',
+                        size: 12
+                    }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+    
+    // Gráfica de fallas por plataforma
+    const ctxPlataforma = document.getElementById('chartPlataforma').getContext('2d');
+    charts.plataforma = new Chart(ctxPlataforma, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(data.fallas_por_plataforma),
+            datasets: [{
+                label: 'Cantidad de Fallas',
+                data: Object.values(data.fallas_por_plataforma),
+                backgroundColor: [
+                    'rgba(25, 118, 210, 0.7)',
+                    'rgba(123, 31, 162, 0.7)',
+                    'rgba(0, 180, 216, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(25, 118, 210, 1)',
+                    'rgba(123, 31, 162, 1)',
+                    'rgba(0, 180, 216, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'end',
+                    formatter: (value) => value,
+                    color: '#333',
+                    font: {
+                        weight: 'bold',
+                        size: 12
+                    }
+                }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+    
+    // Gráfica de fallas por centro
+    const ctxCentro = document.getElementById('chartCentro').getContext('2d');
+    charts.centro = new Chart(ctxCentro, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(data.fallas_por_centro),
+            datasets: [{
+                label: 'Cantidad de Fallas',
+                data: Object.values(data.fallas_por_centro),
+                backgroundColor: 'rgba(102, 126, 234, 0.7)',
+                borderColor: 'rgba(102, 126, 234, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+        }
+    });
+    
+    // Gráfica de tiempo promedio
+    const ctxTiempo = document.getElementById('chartTiempoPromedio').getContext('2d');
+    charts.tiempo = new Chart(ctxTiempo, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(data.tiempo_promedio_por_tipo),
+            datasets: [{
+                label: 'Tiempo Promedio (minutos)',
+                data: Object.values(data.tiempo_promedio_por_tipo),
+                backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                borderColor: 'rgba(220, 53, 69, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+    
+    // Gráfica de razones de caída normalizadas (torta)
+    const ctxRazones = document.getElementById('chartRazonesCaida').getContext('2d');
+    charts.razones = new Chart(ctxRazones, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(data.observaciones_comunes),
+            datasets: [{
+                label: 'Cantidad de Ocurrencias',
+                data: Object.values(data.observaciones_comunes),
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(54, 162, 235, 0.7)',
+                    'rgba(255, 206, 86, 0.7)',
+                    'rgba(75, 192, 192, 0.7)',
+                    'rgba(153, 102, 255, 0.7)',
+                    'rgba(255, 159, 64, 0.7)',
+                    'rgba(199, 199, 199, 0.7)',
+                    'rgba(83, 102, 255, 0.7)',
+                    'rgba(255, 99, 255, 0.7)',
+                    'rgba(99, 255, 132, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)',
+                    'rgba(199, 199, 199, 1)',
+                    'rgba(83, 102, 255, 1)',
+                    'rgba(255, 99, 255, 1)',
+                    'rgba(99, 255, 132, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const index = elements[0].index;
+                    const razon = Object.keys(data.observaciones_comunes)[index];
+                    mostrarDetalleIncidencias(razon);
+                }
+            },
+            plugins: {
+                legend: { 
+                    position: 'right',
+                    labels: {
+                        font: { size: 11 },
+                        padding: 10
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%) - Click para ver detalle`;
+                        }
+                    }
+                },
+                datalabels: {
+                    color: '#fff',
+                    font: {
+                        weight: 'bold',
+                        size: 13
+                    },
+                    formatter: (value, context) => {
+                        const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                        const percentage = ((value / total) * 100).toFixed(1);
+                        return `${value}\n(${percentage}%)`;
+                    }
+                }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+    
+    // Mostrar observaciones comunes
+    const observacionesContainer = document.getElementById('observacionesContainer');
+    observacionesContainer.innerHTML = '';
+    
+    if (Object.keys(data.observaciones_comunes).length === 0) {
+        observacionesContainer.innerHTML = '<p style="text-align: center; color: #999;">No hay observaciones registradas</p>';
+    } else {
+        Object.entries(data.observaciones_comunes).forEach(([razon, count]) => {
+            const item = document.createElement('div');
+            item.className = 'observacion-item';
+            item.innerHTML = `
+                <div class="text">${razon}</div>
+                <div class="count">Ocurrencias: ${count}</div>
+            `;
+            observacionesContainer.appendChild(item);
+        });
+    }
+}
+
+// Cargar estadísticas al cargar la página
+window.addEventListener('load', function() {
+    cargarEstadisticas();
+});
+</script>
+{% endblock %}

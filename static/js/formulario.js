@@ -7,10 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const MODO_EDICION = formElement.dataset.incidenciaId !== '';
     const INCIDENCIA_ID = formElement.dataset.incidenciaId;
 
-    const allSections = document.querySelectorAll('.form-section');
-    const seccionTipoIncidencia = document.getElementById('section-tipo-incidencia');
     const seccionModulos = document.getElementById('section-modulos-estanques');
-    const seccionSensores = document.getElementById('section-sistema-sensores');
     const seccionRiesgos = document.getElementById('section-evaluacion-riesgos');
     const seccionOperario = document.getElementById('section-contacto-operario');
     
@@ -18,10 +15,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const moduloSelect = document.getElementById('modulo');
     const estanqueSelect = document.getElementById('estanque');
     const operarioSelect = document.getElementById('operarioContacto');
-    const sensorDetectadoSelect = document.getElementById('sensorDetectado');
-
-    const tipoModulosRadio = document.getElementById('tipoModulos');
-    const tipoSensoresRadio = document.getElementById('tipoSensores');
     
     const tiempoResolucionInput = document.getElementById('tiempoResolucion');
     const submitButton = document.getElementById('submitForm');
@@ -50,7 +43,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function rellenarSelectOperarios(items) {
         operarioSelect.innerHTML = '';
-        operarioSelect.removeAttribute('required'); // Operario es opcional
+        operarioSelect.removeAttribute('required');
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
         defaultOption.textContent = 'Seleccione un operario';
@@ -77,50 +70,35 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function setupParametroCascada(checkId, nivelSelectId, valorInputId) {
         const check = document.getElementById(checkId);
-        const nivelLabel = document.querySelector(`label[for="${nivelSelectId}"]`);
-        const nivelSelect = document.getElementById(nivelSelectId);
+        const card = document.getElementById('card-' + checkId);
+        const fieldsDiv = card ? card.querySelector('.parametro-fields') : null;
         const valorInput = valorInputId ? document.getElementById(valorInputId) : null;
 
-        if (!check || !nivelLabel || !nivelSelect) {
+        if (!check || !card || !fieldsDiv) {
             console.warn('Faltan elementos para la cascada del parámetro:', checkId);
-            return () => {}; // Devuelve una función vacía
+            return () => {};
         }
 
         function toggleCheck() {
             if (check.checked) {
-                nivelLabel.classList.remove('hidden-input');
-                nivelSelect.classList.remove('hidden-input');
-                toggleNivel(); 
+                card.classList.add('active');
+                fieldsDiv.classList.remove('hidden-input');
             } else {
-                nivelLabel.classList.add('hidden-input');
-                nivelSelect.classList.add('hidden-input');
-                if (valorInput) {
-                    valorInput.classList.add('hidden-input');
-                }
-            }
-        }
-        
-        function toggleNivel() {
-            if (valorInput) {
-                if (nivelSelect.value === 'alta' || nivelSelect.value === 'baja') {
-                    valorInput.classList.remove('hidden-input');
-                } else {
-                    valorInput.classList.add('hidden-input');
-                }
+                card.classList.remove('active');
+                fieldsDiv.classList.add('hidden-input');
             }
         }
 
         check.addEventListener('change', toggleCheck);
-        nivelSelect.addEventListener('change', toggleNivel);
 
         if (valorInput) {
             valorInput.addEventListener('input', validarInputComa);
         }
         
-        return toggleCheck; // Devolvemos la función para llamarla en modo edición
+        return toggleCheck;
     }
 
-    // --- 3. LÓGICA DE POBLAR MENÚS (REESTRUCTURADO) ---
+    // --- 3. LÓGICA DE POBLAR MENÚS ---
     
     function poblarOperarios() {
         const centroId = centroSelect.value;
@@ -141,7 +119,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             rellenarSelectSimple(moduloSelect, [], 'Seleccione un módulo');
         }
-        // Siempre limpiar estanques al cambiar de centro
         rellenarSelectSimple(estanqueSelect, [], 'Seleccione un estanque');
     }
 
@@ -157,74 +134,43 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // --- 4. LÓGICA DE EVENTOS (Listeners) ---
+    // --- 4. LÓGICA DE EVENTOS ---
     
     centroSelect.addEventListener('change', function() {
         const centroId = centroSelect.value;
         if (centroId) {
-            seccionTipoIncidencia.classList.remove('hidden');
-            poblarOperarios(); // <--- Llamar a la función
-            poblarModulos();   // <--- Llamar a la función
+            seccionModulos.classList.remove('hidden');
+            poblarOperarios();
+            poblarModulos();
         } else {
-            seccionTipoIncidencia.classList.add('hidden');
+            seccionModulos.classList.add('hidden');
             poblarOperarios();
             poblarModulos();
         }
         if (!MODO_EDICION) {
-            seccionModulos.classList.add('hidden');
-            seccionSensores.classList.add('hidden');
             seccionRiesgos.classList.add('hidden');
             seccionOperario.classList.add('hidden');
-            tipoModulosRadio.checked = false;
-            tipoSensoresRadio.checked = false;
         }
         operarioInfoDiv.classList.add('info-operario-hidden');
     });
 
-    moduloSelect.addEventListener('change', poblarEstanques); // <--- Llamar a la función
+    moduloSelect.addEventListener('change', poblarEstanques);
 
-    tipoModulosRadio.addEventListener('change', function() {
-        if (tipoModulosRadio.checked) {
-            seccionModulos.classList.remove('hidden');
-            seccionSensores.classList.add('hidden');
-            if (!MODO_EDICION) {
-                seccionRiesgos.classList.add('hidden');
-                seccionOperario.classList.add('hidden');
-            }
-        }
-    });
-    
-    tipoSensoresRadio.addEventListener('change', function() {
-        if (tipoSensoresRadio.checked) {
-            seccionSensores.classList.remove('hidden');
-            seccionModulos.classList.add('hidden');
-            if (!MODO_EDICION) {
-                seccionRiesgos.classList.add('hidden');
-                seccionOperario.classList.add('hidden');
-            }
-        }
-    });
-
-    // --- 5. LÓGICA DE PARÁMETROS (Oxígeno, Temp, etc.) ---
+    // --- 5. LÓGICA DE PARÁMETROS ---
     const toggleOxigeno = setupParametroCascada('oxigeno', 'oxigenoNivel', 'valorOxigeno');
     const toggleTemperatura = setupParametroCascada('temperatura', 'temperaturaNivel', 'valorTemperatura');
     const toggleTurbidez = setupParametroCascada('turbidez', 'turbidezNivel', 'valorTurbidez');
     const toggleConductividad = setupParametroCascada('conductividad', 'conductividadNivel');
 
-    // --- 6. LÓGICA DE CASCADA (Secciones 5 y 6) ---
+    // --- 6. LÓGICA DE CASCADA ---
     function mostrarSeccionRiesgos() {
-        if (!seccionModulos.classList.contains('hidden') || !seccionSensores.classList.contains('hidden')) {
+        if (!seccionModulos.classList.contains('hidden')) {
             seccionRiesgos.classList.remove('hidden');
         }
     }
 
     estanqueSelect.addEventListener('change', function() {
         if (estanqueSelect.value) { mostrarSeccionRiesgos(); } 
-        else if (!MODO_EDICION) { seccionRiesgos.classList.add('hidden'); }
-    });
-
-    sensorDetectadoSelect.addEventListener('change', function() {
-        if (sensorDetectadoSelect.value) { mostrarSeccionRiesgos(); } 
         else if (!MODO_EDICION) { seccionRiesgos.classList.add('hidden'); }
     });
 
@@ -254,28 +200,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // --- 8. LÓGICA DE "MODO EDICIÓN" (MÁS ROBUSTA) ---
+    // --- 8. LÓGICA DE MODO EDICIÓN ---
     if (MODO_EDICION && window.INCIDENCIA_A_EDITAR) {
         const data = window.INCIDENCIA_A_EDITAR;
-        console.log('Modo edición - Datos cargados:', data);
-        console.log('Centro seleccionado:', centroSelect.value);
-        console.log('Datos módulos disponibles:', window.DATOS_MODULOS);
-
-        // 1. Poblar las listas que dependen del Centro
-        // (El centro ya está seleccionado por Django)
+        
         poblarOperarios();
         poblarModulos();
         
-        // 2. Seleccionar el Operario
         if (data.operario_contacto_id) {
             operarioSelect.value = data.operario_contacto_id;
-            // Disparamos 'change' para que se muestre la info del operario
             operarioSelect.dispatchEvent(new Event('change')); 
         }
         
-        // 3. Seleccionar el Módulo
         if (data.modulo) {
-            // Si el módulo no existe en la lista, agregarlo
             if (!Array.from(moduloSelect.options).some(opt => opt.value === data.modulo)) {
                 const opt = document.createElement('option');
                 opt.value = data.modulo;
@@ -283,13 +220,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 moduloSelect.appendChild(opt);
             }
             moduloSelect.value = data.modulo;
-            
-            // 4. Poblar la lista de Estanques
             poblarEstanques();
             
-            // 5. Seleccionar el Estanque
             if (data.estanque) {
-                // Si el estanque no existe en la lista, agregarlo
                 if (!Array.from(estanqueSelect.options).some(opt => opt.value === data.estanque)) {
                     const opt = document.createElement('option');
                     opt.value = data.estanque;
@@ -300,9 +233,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        // 6. Marcar checkboxes de parámetros
         data.parametros_afectados.forEach(paramId => {
-            if (paramId) { // paramId es "oxigeno", "pH", etc.
+            if (paramId) {
                 const check = document.getElementById(paramId);
                 if (check) {
                     check.checked = true;
@@ -310,13 +242,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         
-        // 7. Disparar los toggles de los parámetros para mostrar los selects/inputs
         toggleOxigeno();
         toggleTemperatura();
         toggleTurbidez();
         toggleConductividad();
     }
-
 
     // --- 9. LÓGICA DE ENVIAR FORMULARIO ---
     
@@ -335,20 +265,19 @@ document.addEventListener('DOMContentLoaded', function () {
         submitButton.disabled = true;
         submitButton.textContent = 'Guardando...';
 
-        // 1. Recolectar datos
         const parametros = Array.from(document.querySelectorAll('input[name="parametros"]:checked'))
                                 .map(cb => cb.value)
                                 .join(',');
 
-        const riesgoPeces = document.querySelector('input[name="riesgoPeces"]:checked')?.value === 'si';
-        const perdidaEconomica = document.querySelector('input[name="perdidaEconomica"]:checked')?.value === 'si';
-        const riesgoPersonas = document.querySelector('input[name="riesgoPersonas"]:checked')?.value === 'si';
+        const riesgoPeces = document.getElementById('riesgoPeces').value === 'si';
+        const perdidaEconomica = document.getElementById('perdidaEconomica').value === 'si';
+        const riesgoPersonas = document.getElementById('riesgoPersonas').value === 'si';
         
         const data = {
             fecha_hora: document.getElementById('fechaHora').value,
             turno: document.getElementById('turno').value,
             centro: document.getElementById('centro').value || null,
-            tipo_incidencia: document.querySelector('input[name="tipoIncidencia"]:checked')?.value || '',
+            tipo_incidencia: 'modulos',
             modulo: document.getElementById('modulo').value,
             estanque: document.getElementById('estanque').value,
             parametros_afectados: parametros,
@@ -359,10 +288,6 @@ document.addEventListener('DOMContentLoaded', function () {
             conductividad_nivel: document.getElementById('conductividadNivel').value,
             turbidez_nivel: document.getElementById('turbidezNivel').value,
             turbidez_valor: document.getElementById('valorTurbidez').value,
-            sistema_sensor: document.getElementById('sistemaSensor').value,
-            sensor_detectado: document.getElementById('sensorDetectado').value,
-            sensor_nivel: document.getElementById('sensorNivel').value,
-            sensor_valor: document.getElementById('valorSensor').value,
             tiempo_resolucion: document.getElementById('tiempoResolucion').value || null,
             riesgo_peces: riesgoPeces,
             perdida_economica: perdidaEconomica,
@@ -372,7 +297,6 @@ document.addEventListener('DOMContentLoaded', function () {
             tipo_incidencia_normalizada: document.getElementById('tipoIncidenciaNormalizada').value,
         };
 
-        // 2. Decidir a qué API llamar
         let url = '/api/registrar-incidencia/';
         let method = 'POST';
         
@@ -381,7 +305,6 @@ document.addEventListener('DOMContentLoaded', function () {
             method = 'PUT';
         }
 
-        // 3. Enviar los datos
         fetch(url, {
             method: method,
             headers: {
@@ -396,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error(JSON.stringify(errorData));
             });
         })
-        .then(data => {
+        .then(result => {
             if (MODO_EDICION) {
                 alert('¡Incidencia actualizada con éxito!');
                 window.location.href = '/reporte/';

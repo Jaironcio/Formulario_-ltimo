@@ -1,0 +1,192 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block title %}Consulta Sensores{% endblock %}
+{% block page_title %}Consulta de Reportes de Sensores{% endblock %}
+{% block page_subtitle %}Sistema Ideal Control - Historial de monitoreo{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'css/formulario.css' %}">
+<style>
+    .page-layout, .sidebar-actions { display: none !important; }
+    .content-wrapper { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+    .stats-row { display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
+    .stat-box { background: linear-gradient(135deg, #00b4d8, #0077b6); color: white; padding: 20px; border-radius: 12px; flex: 1; min-width: 150px; text-align: center; }
+    .stat-box.danger { background: linear-gradient(135deg, #dc3545, #c82333); }
+    .stat-box .number { font-size: 2em; font-weight: 700; }
+    .stat-box .label { font-size: 0.85em; opacity: 0.9; }
+    .filters-section { background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px; }
+    .filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 15px; }
+    .filter-item label { display: block; font-weight: 600; margin-bottom: 5px; color: #333; font-size: 0.85em; }
+    .filter-item input, .filter-item select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+    .filter-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-filter { padding: 10px 20px; background: linear-gradient(135deg, #00b4d8, #0077b6); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .btn-clear { padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; text-decoration: none; }
+    .badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }
+    .badge-success { background: #28a745; color: white; }
+    .badge-danger { background: #dc3545; color: white; }
+    .badge-warning { background: #ffc107; color: #333; }
+    .reporte-card { background: #fff; border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e0e0e0; }
+    .reporte-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #00b4d8; flex-wrap: wrap; gap: 15px; }
+    .reporte-title { font-size: 1.2em; font-weight: 700; color: #1e3a5f; }
+    .reporte-meta { color: #666; font-size: 0.9em; }
+    .reporte-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-toggle { width: 100%; padding: 12px; background: linear-gradient(135deg, #17a2b8, #138496); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 15px; }
+    .btn-delete-reporte { padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85em; }
+    .detalle-sensores { display: none; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0; }
+    .sensor-item { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #00b4d8; }
+    .sensor-item.alto { border-left-color: #dc3545; }
+    .sensor-item.bajo { border-left-color: #ffc107; }
+    .sensor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 10px; }
+    .sensor-field { font-size: 0.9em; }
+    .sensor-field strong { color: #00b4d8; }
+    .sensor-estado { text-align: center; padding: 10px; border-radius: 6px; font-weight: 700; }
+    .sensor-estado.normal { background: #d4edda; color: #155724; }
+    .sensor-estado.alto { background: #f8d7da; color: #721c24; }
+    .sensor-estado.bajo { background: #fff3cd; color: #856404; }
+    .sensor-actions { display: flex; gap: 10px; margin-top: 12px; }
+    .btn-edit { flex: 1; padding: 8px; background: #ffc107; color: #333; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .btn-delete { flex: 1; padding: 8px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'monitoreo_sensores' %}" class="header-btn primary">
+    <i class="fas fa-plus"></i> Nuevo Registro
+</a>
+<button class="header-btn" id="exportPdfSensoresBtn">
+    <i class="fas fa-file-pdf"></i> PDF
+</button>
+<button class="header-btn" onclick="generarReporteGeneral()" style="background: #e67e22;">
+    <i class="fas fa-file-alt"></i> Reporte Consolidado
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    {% csrf_token %}
+    
+    <div class="stats-row">
+        <div class="stat-box">
+            <div class="number">{{ total_registros }}</div>
+            <div class="label">Total Registros</div>
+        </div>
+        <div class="stat-box danger">
+            <div class="number">{{ total_altos|add:total_bajos }}</div>
+            <div class="label">Incidencias</div>
+        </div>
+    </div>
+
+    <div class="filters-section">
+        <form method="get" action="{% url 'consulta_sensores' %}">
+            <div class="filters-grid">
+                <div class="filter-item">
+                    <label for="filtroFecha">Fecha</label>
+                    <input type="date" id="filtroFecha" name="fecha" value="{{ filtros_aplicados.fecha }}">
+                </div>
+                <div class="filter-item">
+                    <label for="filtroTurno">Turno</label>
+                    <select id="filtroTurno" name="turno">
+                        <option value="">Todos</option>
+                        <option value="MAÑANA" {% if filtros_aplicados.turno == 'MAÑANA' %}selected{% endif %}>Mañana</option>
+                        <option value="TARDE" {% if filtros_aplicados.turno == 'TARDE' %}selected{% endif %}>Tarde</option>
+                        <option value="NOCHE" {% if filtros_aplicados.turno == 'NOCHE' %}selected{% endif %}>Noche</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="filtroCentro">Centro</label>
+                    <select id="filtroCentro" name="centro">
+                        <option value="">Todos</option>
+                        {% for c in centros %}<option value="{{ c.id }}" {% if filtros_aplicados.centro == c.id %}selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn-filter"><i class="fas fa-search"></i> Buscar</button>
+                <a href="{% url 'consulta_sensores' %}" class="btn-clear"><i class="fas fa-undo"></i> Limpiar</a>
+            </div>
+        </form>
+    </div>
+
+    <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <span class="badge badge-success">✓ {{ total_normales }} Normal</span>
+        <span class="badge badge-danger">↑ {{ total_altos }} Alto</span>
+        <span class="badge badge-warning">↓ {{ total_bajos }} Bajo</span>
+    </div>
+
+    <div id="registrosSensoresList">
+        {% for reporte in reportes %}
+        <div class="reporte-card">
+            <div class="reporte-header">
+                <div>
+                    <div class="reporte-title">📅 {{ reporte.fecha|date:"d/m/Y" }} - Turno {{ reporte.turno }}</div>
+                    <div class="reporte-meta">👤 {{ reporte.responsable }} | 🏢 {{ reporte.centros }} | 📊 {{ reporte.total_sensores }} sensores</div>
+                </div>
+                <div class="reporte-stats">
+                    <span class="badge {% if reporte.total_incidencias > 0 %}badge-danger{% else %}badge-success{% endif %}">
+                        {% if reporte.total_incidencias > 0 %}⚠️{% else %}✓{% endif %} {{ reporte.total_incidencias }} incidencias
+                    </span>
+                    <button onclick="eliminarReporteCompleto('{{ reporte.fecha|date:'Y-m-d' }}', '{{ reporte.turno }}')" class="btn-delete-reporte">🗑️</button>
+                </div>
+            </div>
+            
+            <button class="btn-toggle" onclick="toggleDetalle('detalle-{{ forloop.counter }}')">
+                📋 Ver Detalle de {{ reporte.total_sensores }} Sensores
+            </button>
+            
+            <div id="detalle-{{ forloop.counter }}" class="detalle-sensores">
+                {% for registro in reporte.registros %}
+                <div class="sensor-item {% if registro.estado == 'ALTO' %}alto{% elif registro.estado == 'BAJO' %}bajo{% endif %}"
+                     data-fecha="{{ reporte.fecha|date:'Y-m-d' }}"
+                     data-turno="{{ reporte.turno }}"
+                     data-centro="{{ registro.centro.nombre }}"
+                     data-sistema="{{ registro.sensor.sistema }}"
+                     data-equipo="{{ registro.sensor.equipo }}"
+                     data-tipo="{{ registro.sensor.tipo_medicion }}"
+                     data-estado="{{ registro.estado }}"
+                     data-limites="{{ registro.sensor.limite_min|default:'-' }} / {{ registro.sensor.limite_max|default:'-' }}"
+                     data-observacion="{{ registro.observacion|default:'' }}"
+                >
+                    <div class="sensor-grid">
+                        <div class="sensor-field"><strong>🏢 Centro:</strong> {{ registro.centro.nombre }}</div>
+                        <div class="sensor-field"><strong>⚙️ Sistema:</strong> {{ registro.sensor.sistema }}</div>
+                        <div class="sensor-field"><strong>📡 Equipo:</strong> {{ registro.sensor.equipo }}</div>
+                        <div class="sensor-field"><strong>📊 Tipo:</strong> {{ registro.sensor.tipo_medicion }}</div>
+                        <div class="sensor-field"><strong>⚖️ Límites:</strong> {{ registro.sensor.limite_min|default:"-" }} / {{ registro.sensor.limite_max|default:"-" }}</div>
+                    </div>
+                    <div class="sensor-estado {% if registro.estado == 'NORMAL' %}normal{% elif registro.estado == 'ALTO' %}alto{% else %}bajo{% endif %}">
+                        {% if registro.estado == 'NORMAL' %}✓ NORMAL{% elif registro.estado == 'ALTO' %}⚠️ ALTO{% else %}⚠️ BAJO{% endif %}
+                    </div>
+                    {% if registro.observacion %}<div style="margin-top: 10px; padding: 10px; background: white; border-radius: 6px;"><strong>💬</strong> {{ registro.observacion }}</div>{% endif %}
+                    <div class="sensor-actions">
+                        <button onclick="editarRegistro({{ registro.id }}, '{{ registro.estado }}', '{{ registro.observacion|escapejs }}')" class="btn-edit">✏️ Editar</button>
+                        <button onclick="eliminarRegistro({{ registro.id }})" class="btn-delete">🗑️ Eliminar</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% empty %}
+        <p style="text-align: center; color: #999; padding: 40px;">No hay registros con los filtros seleccionados.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="{% static 'js/consulta_sensores.js' %}"></script>
+<script>
+function generarReporteGeneral() {
+    const fecha = document.querySelector('input[name="fecha"]')?.value || '';
+    const turno = document.querySelector('select[name="turno"]')?.value || '';
+    let url = '{% url "generar_reporte_general_pdf" %}';
+    const params = new URLSearchParams();
+    if (fecha) params.append('fecha', fecha);
+    if (turno) params.append('turno', turno);
+    if (params.toString()) url += '?' + params.toString();
+    window.open(url, '_blank');
+}
+</script>
+{% endblock %}

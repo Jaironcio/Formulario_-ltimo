@@ -29,7 +29,14 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 # Permitir acceso desde browser preview
-CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8001', 'http://localhost:8001', 'http://127.0.0.1:62590']
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:8000', 
+    'http://localhost:8000',
+    'http://127.0.0.1:8001', 
+    'http://localhost:8001', 
+    'http://127.0.0.1:54092',
+    'http://127.0.0.1:62590',
+]
 
 
 # Application definition
@@ -95,9 +102,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'cermaq_incidencias',
+        'NAME': 'cermaq_incidencias_django',
         'USER': 'root',
-        'PASSWORD': '',  # XAMPP usa contraseña vacía por defecto
+        'PASSWORD': '',
         'HOST': '127.0.0.1',
         'PORT': '3306',
         'OPTIONS': {
@@ -106,6 +113,22 @@ DATABASES = {
         },
     }
 }
+
+# Configuración MySQL (comentada, descomentar si se necesita)
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'cermaq_incidencias',
+#         'USER': 'root',
+#         'PASSWORD': '',
+#         'HOST': '127.0.0.1',
+#         'PORT': '3306',
+#         'OPTIONS': {
+#             'charset': 'utf8mb4',
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+#         },
+#     }
+# }
 
 # Desactivar verificación de versión de MariaDB y características no compatibles
 import django.db.backends.mysql.base
@@ -144,9 +167,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-cl'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Santiago'
 
 USE_I18N = True
 
@@ -164,6 +187,6 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Configuración de Auth
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/panel/'
+LOGOUT_REDIRECT_URL = '/'
 LOGIN_URL = '/accounts/login/'

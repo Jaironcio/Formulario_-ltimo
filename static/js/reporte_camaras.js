@@ -38,11 +38,18 @@ document.addEventListener('DOMContentLoaded', function() {
         cargarReporteParaEditar(reporteIdEditar);
     }
     
+    // Función para auto-expandir textarea
+    function autoExpandTextarea(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+    }
+    
     // Configurar event listeners para mostrar/ocultar campos de incidencias
     centros.forEach(centro => {
         const radioOk = document.getElementById(`${centro}_ok`);
         const radioIncidencia = document.getElementById(`${centro}_incidencia`);
         const inputContainer = document.getElementById(`${centro}_input`);
+        const textarea = inputContainer.querySelector('textarea');
         
         radioOk.addEventListener('change', function() {
             if (this.checked) {
@@ -53,7 +60,14 @@ document.addEventListener('DOMContentLoaded', function() {
         radioIncidencia.addEventListener('change', function() {
             if (this.checked) {
                 inputContainer.classList.add('active');
+                // Auto-expandir al mostrar si ya tiene contenido
+                setTimeout(() => autoExpandTextarea(textarea), 10);
             }
+        });
+        
+        // Auto-expandir mientras el usuario escribe
+        textarea.addEventListener('input', function() {
+            autoExpandTextarea(this);
         });
     });
     
@@ -183,12 +197,79 @@ document.addEventListener('DOMContentLoaded', function() {
             const footer = document.querySelector('.acciones-footer');
             footer.style.display = 'none';
             
+            // Formatear fecha para la captura
+            const fechaInput = document.getElementById('fecha');
+            const fechaOriginal = fechaInput.value;
+            const fechaFormateada = new Date(fechaOriginal + 'T00:00:00').toLocaleDateString('es-CL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            
+            // Reemplazar input de fecha con texto formateado
+            const fechaDiv = document.createElement('div');
+            fechaDiv.style.cssText = 'width: 100%; padding: 10px; font-size: 1em;';
+            fechaDiv.textContent = fechaFormateada;
+            const fechaParent = fechaInput.parentNode;
+            fechaParent.replaceChild(fechaDiv, fechaInput);
+            
+            // Convertir textareas a divs para captura (guardar referencias para restaurar)
+            const textareas = document.querySelectorAll('.incidencia-input textarea');
+            const textareasBackup = [];
+            
+            textareas.forEach(textarea => {
+                if (textarea.value.trim() !== '') {
+                    const div = document.createElement('div');
+                    div.style.cssText = `
+                        width: 100%;
+                        padding: 12px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        background: white;
+                        font-family: inherit;
+                        font-size: 1em;
+                        line-height: 1.5;
+                        white-space: pre-wrap;
+                        word-wrap: break-word;
+                    `;
+                    div.textContent = textarea.value;
+                    
+                    // Guardar referencia para restaurar
+                    textareasBackup.push({
+                        textarea: textarea,
+                        parent: textarea.parentNode
+                    });
+                    
+                    // Reemplazar textarea con div
+                    textarea.parentNode.replaceChild(div, textarea);
+                }
+            });
+            
+            // Esperar un momento para que el DOM se actualice
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
             const reporteContenido = document.getElementById('reporte-contenido');
             
             const canvas = await html2canvas(reporteContenido, {
                 scale: 2,
                 backgroundColor: '#ffffff',
-                logging: false
+                logging: false,
+                windowHeight: reporteContenido.scrollHeight,
+                height: reporteContenido.scrollHeight
+            });
+            
+            // Restaurar fecha
+            const fechaDivToRestore = fechaParent.querySelector('div');
+            if (fechaDivToRestore) {
+                fechaParent.replaceChild(fechaInput, fechaDivToRestore);
+            }
+            
+            // Restaurar textareas
+            textareasBackup.forEach(backup => {
+                const div = backup.parent.querySelector('div');
+                if (div) {
+                    backup.parent.replaceChild(backup.textarea, div);
+                }
             });
             
             // Restaurar botones
@@ -390,7 +471,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (tieneIncidencias) {
                         document.getElementById(`${centro}_incidencia`).checked = true;
                         document.getElementById(`${centro}_input`).classList.add('active');
-                        document.querySelector(`#${centro}_input textarea`).value = descripcion;
+                        const textarea = document.querySelector(`#${centro}_input textarea`);
+                        textarea.value = descripcion;
+                        // Auto-expandir después de cargar el contenido
+                        setTimeout(() => autoExpandTextarea(textarea), 10);
                     } else {
                         document.getElementById(`${centro}_ok`).checked = true;
                     }
@@ -430,7 +514,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (centroDatos.tiene_incidencias) {
                         document.getElementById(`${centro}_incidencia`).checked = true;
                         document.getElementById(`${centro}_input`).classList.add('active');
-                        document.querySelector(`#${centro}_input textarea`).value = centroDatos.descripcion;
+                        const textarea = document.querySelector(`#${centro}_input textarea`);
+                        textarea.value = centroDatos.descripcion;
+                        // Auto-expandir después de cargar el contenido
+                        setTimeout(() => autoExpandTextarea(textarea), 10);
                     } else {
                         document.getElementById(`${centro}_ok`).checked = true;
                     }

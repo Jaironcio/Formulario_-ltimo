@@ -14,19 +14,19 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- 2. Poner los valores actuales en los filtros ---
     const currentParams = new URLSearchParams(window.location.search);
     
-    filtroFecha.value = currentParams.get('fecha') || '';
-    filtroTipo.value = currentParams.get('tipo') || '';
-    filtroTurno.value = currentParams.get('turno') || '';
-    filtroCentro.value = currentParams.get('centro') || '';
+    if (filtroFecha) filtroFecha.value = currentParams.get('fecha') || '';
+    if (filtroTipo) filtroTipo.value = currentParams.get('tipo') || '';
+    if (filtroTurno) filtroTurno.value = currentParams.get('turno') || '';
+    if (filtroCentro) filtroCentro.value = currentParams.get('centro') || '';
 
     // --- 3. Lógica de Botones de Filtro ---
     if (aplicarBtn) {
         aplicarBtn.addEventListener('click', function () {
             const params = new URLSearchParams();
-            if (filtroFecha.value) { params.set('fecha', filtroFecha.value); }
-            if (filtroTipo.value) { params.set('tipo', filtroTipo.value); }
-            if (filtroTurno.value) { params.set('turno', filtroTurno.value); }
-            if (filtroCentro.value) { params.set('centro', filtroCentro.value); }
+            if (filtroFecha && filtroFecha.value) { params.set('fecha', filtroFecha.value); }
+            if (filtroTipo && filtroTipo.value) { params.set('tipo', filtroTipo.value); }
+            if (filtroTurno && filtroTurno.value) { params.set('turno', filtroTurno.value); }
+            if (filtroCentro && filtroCentro.value) { params.set('centro', filtroCentro.value); }
             window.location.search = params.toString();
         });
     }

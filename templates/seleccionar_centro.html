@@ -86,6 +86,18 @@
         .btn-camaras:hover {
             background-color: #138496;
         }
+        .btn-sensores {
+            background-color: #ff6b6b; /* Rojo coral para Sensores */
+        }
+        .btn-sensores:hover {
+            background-color: #ee5a52;
+        }
+        .btn-plataformas {
+            background-color: #9b59b6; /* Púrpura para Plataformas */
+        }
+        .btn-plataformas:hover {
+            background-color: #8e44ad;
+        }
     </style>
 </head>
 <body>
@@ -110,6 +122,14 @@
         
         <a href="{% url 'reporte_camaras' %}" class="selector-button btn-camaras">
             Reporte de Cámaras
+        </a>
+        
+        <a href="{% url 'monitoreo_sensores' %}" class="selector-button btn-sensores">
+            🔧 Sistema de Monitoreo de Sensores
+        </a>
+        
+        <a href="{% url 'reporte_plataformas' %}" class="selector-button btn-plataformas">
+            📡 Reporte Plataformas (INNOVEX/SINPLANT)
         </a>
     </div>
 </body>

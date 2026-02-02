@@ -1,0 +1,570 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Panel de Control{% endblock %} - Cermaq Chile</title>
+    <link rel="icon" type="image/png" href="{% static 'imagenes/logo-pestaña.png' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Profesional */
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #1e3a5f 0%, #0a1929 100%);
+            color: white;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.collapsed {
+            width: 80px;
+        }
+
+        .sidebar-header {
+            padding: 20px 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar-logo img {
+            height: 40px;
+            border-radius: 8px;
+        }
+
+        .sidebar-logo span {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .sidebar.collapsed .sidebar-logo span {
+            display: none;
+        }
+
+        .sidebar-logo .highlight {
+            color: #00b4d8;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .sidebar.collapsed .user-info {
+            justify-content: center;
+            padding: 12px 8px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #00b4d8, #0077b6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .user-details h4 {
+            font-size: 13px;
+            margin-bottom: 2px;
+        }
+
+        .user-details span {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .sidebar.collapsed .user-details {
+            display: none;
+        }
+
+        /* Menu Items */
+        .menu-section {
+            padding: 15px 10px;
+        }
+
+        .menu-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-bottom: 10px;
+            padding-left: 10px;
+        }
+
+        .sidebar.collapsed .menu-title {
+            display: none;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 15px;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            border-radius: 10px;
+            margin-bottom: 4px;
+            transition: all 0.3s;
+        }
+
+        .sidebar.collapsed .menu-item {
+            justify-content: center;
+            padding: 12px;
+        }
+
+        .menu-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .menu-item.active {
+            background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 180, 216, 0.3);
+        }
+
+        .menu-item i {
+            width: 20px;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .menu-item span {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .sidebar.collapsed .menu-item span {
+            display: none;
+        }
+
+        /* Toggle Button */
+        .sidebar-toggle {
+            position: absolute;
+            top: 20px;
+            right: -15px;
+            width: 30px;
+            height: 30px;
+            background: #00b4d8;
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1001;
+        }
+
+        /* Logout Button */
+        .logout-section {
+            padding: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: auto;
+            background: linear-gradient(180deg, transparent, #0a1929);
+        }
+
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 12px;
+            background: rgba(231, 76, 60, 0.2);
+            color: #ff6b6b;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .sidebar.collapsed .logout-btn span {
+            display: none;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            flex: 1;
+            padding: 25px;
+            min-height: 100vh;
+            transition: margin-left 0.3s;
+        }
+
+        .sidebar.collapsed ~ .main-content {
+            margin-left: 80px;
+        }
+
+        /* Top Header */
+        .top-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .page-title h1 {
+            font-size: 24px;
+            color: #1e3a5f;
+            margin-bottom: 5px;
+        }
+
+        .page-title p {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .header-btn {
+            padding: 10px 18px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #333;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+
+        .header-btn:hover {
+            background: #f8f9fa;
+            border-color: #00b4d8;
+            color: #00b4d8;
+        }
+
+        .header-btn.primary {
+            background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+            color: white;
+            border: none;
+        }
+
+        .header-btn.primary:hover {
+            box-shadow: 0 4px 15px rgba(0, 180, 216, 0.4);
+        }
+
+        /* Content Card */
+        .content-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+        }
+
+        .content-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .content-card-header h2 {
+            font-size: 18px;
+            color: #1e3a5f;
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .sidebar {
+                width: 80px;
+            }
+            
+            .sidebar-logo span,
+            .user-details,
+            .menu-title,
+            .menu-item span,
+            .logout-btn span {
+                display: none;
+            }
+
+            .menu-item {
+                justify-content: center;
+                padding: 12px;
+            }
+
+            .main-content {
+                margin-left: 80px;
+            }
+
+            .sidebar-toggle {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 280px;
+            }
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .sidebar-logo span,
+            .user-details,
+            .menu-title,
+            .menu-item span,
+            .logout-btn span {
+                display: block;
+            }
+
+            .menu-item {
+                justify-content: flex-start;
+                padding: 12px 15px;
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .mobile-menu-btn {
+                display: flex !important;
+            }
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            padding: 10px;
+            background: #1e3a5f;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        .overlay.active {
+            display: block;
+        }
+
+        {% block extra_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    
+    <!-- Overlay for mobile -->
+    <div class="overlay" id="overlay" onclick="toggleMobileMenu()"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" title="Colapsar menú">
+            <i class="fas fa-chevron-left" id="toggle-icon"></i>
+        </button>
+        
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <img src="{% static 'imagenes/logo-pestaña.png' %}" alt="Cermaq">
+                <span><span class="highlight">CERMAQ</span></span>
+            </div>
+            <div class="user-info">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-details">
+                    <h4>{{ user.username }}</h4>
+                    <span>{% if user.is_staff %}Administrador{% else %}Visualizador{% endif %}</span>
+                </div>
+            </div>
+        </div>
+
+        <nav class="menu-section">
+            <div class="menu-title">Principal</div>
+            
+            <a href="{% url 'home' %}" class="menu-item {% if active_menu == 'home' %}active{% endif %}">
+                <i class="fas fa-home"></i>
+                <span>Inicio</span>
+            </a>
+
+            <div class="menu-title" style="margin-top: 15px;">Formularios</div>
+            
+            <a href="{% url 'formulario_pcc' %}" class="menu-item {% if active_menu == 'formulario_pcc' %}active{% endif %}">
+                <i class="fas fa-file-alt"></i>
+                <span>Incidencias PCC</span>
+            </a>
+            
+            <a href="{% url 'formulario_santa_juana' %}" class="menu-item {% if active_menu == 'formulario_santa_juana' %}active{% endif %}">
+                <i class="fas fa-industry"></i>
+                <span>Santa Juana</span>
+            </a>
+            
+            <a href="{% url 'monitoreo_sensores' %}" class="menu-item {% if active_menu == 'monitoreo_sensores' %}active{% endif %}">
+                <i class="fas fa-microchip"></i>
+                <span>Sensores</span>
+            </a>
+            
+            <a href="{% url 'reporte_plataformas' %}" class="menu-item {% if active_menu == 'reporte_plataformas' %}active{% endif %}">
+                <i class="fas fa-server"></i>
+                <span>Plataformas</span>
+            </a>
+            
+            <a href="{% url 'reporte_camaras' %}" class="menu-item {% if active_menu == 'reporte_camaras' %}active{% endif %}">
+                <i class="fas fa-video"></i>
+                <span>Cámaras</span>
+            </a>
+
+            <div class="menu-title" style="margin-top: 15px;">Consultas</div>
+            
+            <a href="{% url 'reporte' %}" class="menu-item {% if active_menu == 'reporte' %}active{% endif %}">
+                <i class="fas fa-list"></i>
+                <span>Reportes PCC</span>
+            </a>
+            
+            <a href="{% url 'reporte_santa_juana' %}" class="menu-item {% if active_menu == 'reporte_santa_juana' %}active{% endif %}">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Reportes Santa Juana</span>
+            </a>
+            
+            <a href="{% url 'consulta_sensores' %}" class="menu-item {% if active_menu == 'consulta_sensores' %}active{% endif %}">
+                <i class="fas fa-search"></i>
+                <span>Sensores</span>
+            </a>
+            
+            <a href="{% url 'consulta_plataformas' %}" class="menu-item {% if active_menu == 'consulta_plataformas' %}active{% endif %}">
+                <i class="fas fa-database"></i>
+                <span>Plataformas</span>
+            </a>
+
+            <div class="menu-title" style="margin-top: 15px;">Análisis</div>
+            
+            <a href="{% url 'dashboard' %}" class="menu-item {% if active_menu == 'dashboard' %}active{% endif %}">
+                <i class="fas fa-chart-bar"></i>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="{% url 'dashboard_profesional' %}" class="menu-item {% if active_menu == 'dashboard_profesional' %}active{% endif %}">
+                <i class="fas fa-chart-line"></i>
+                <span>Dashboard Pro</span>
+            </a>
+        </nav>
+
+        <div class="logout-section">
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Cerrar Sesión</span>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="top-header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="page-title">
+                    <h1>{% block page_title %}Panel de Control{% endblock %}</h1>
+                    <p>{% block page_subtitle %}Sistema de Monitoreo y Control - Cermaq Chile{% endblock %}</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                {% block header_actions %}
+                <a href="{% url 'home' %}" class="header-btn">
+                    <i class="fas fa-home"></i>
+                    Inicio
+                </a>
+                {% endblock %}
+            </div>
+        </div>
+
+        {% block content %}
+        <!-- Content goes here -->
+        {% endblock %}
+    </main>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const icon = document.getElementById('toggle-icon');
+            sidebar.classList.toggle('collapsed');
+            
+            if (sidebar.classList.contains('collapsed')) {
+                icon.classList.remove('fa-chevron-left');
+                icon.classList.add('fa-chevron-right');
+            } else {
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-left');
+            }
+        }
+
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active');
+        }
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

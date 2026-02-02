@@ -1,220 +1,294 @@
+{% extends 'base_sidebar.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Incidencias - Santa Juana</title>
+
+{% block title %}{% if incidencia_a_editar %}Editar Incidencia{% else %}Formulario Santa Juana{% endif %}{% endblock %}
+{% block page_title %}{% if incidencia_a_editar %}Editar Incidencia{% else %}Formulario de Incidencias Santa Juana{% endif %}{% endblock %}
+{% block page_subtitle %}Registro de parámetros en módulos y estanques{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'css/formulario.css' %}">
+<style>
+    .form-container {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        max-width: 900px;
+    }
+    .form-container h1 { display: none; }
+    .form-logo { max-height: 60px; }
+    .page-layout { display: block; }
+    .sidebar-actions { display: none; }
     
-    <link rel="stylesheet" href="{% static 'css/formulario.css' %}">
-    
-    <link rel="icon" type="image/png" href="{% static 'imagenes/logo-pestaña.png' %}">
+    .form-section {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 25px;
+        margin-bottom: 20px;
+        border-left: 4px solid #00b4d8;
+    }
+    .form-section h2 {
+        color: #1e3a5f;
+        font-size: 1.2em;
+        margin: 0 0 20px 0;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e0e0e0;
+    }
+    .form-section h3 {
+        color: #1e3a5f;
+        font-size: 1em;
+        margin: 15px 0 10px 0;
+    }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 6px;
+        font-size: 0.9em;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px 15px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 1em;
+        transition: all 0.3s;
+        box-sizing: border-box;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        border-color: #00b4d8;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.1);
+    }
+    .form-group-radio {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 15px;
+        background: white;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        cursor: pointer;
+    }
+    .form-group-radio:hover {
+        background: #e9ecef;
+    }
+    .form-group-radio input[type="radio"] {
+        width: auto;
+    }
+    .form-group-radio label {
+        margin: 0;
+        cursor: pointer;
+    }
+    .hidden { display: none !important; }
+    .hidden-input { display: none; }
+    #submitForm {
+        width: 100%;
+        padding: 15px 30px;
+        background: linear-gradient(135deg, #00b4d8, #0077b6);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 1.1em;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-top: 20px;
+    }
+    #submitForm:hover {
+        box-shadow: 0 6px 20px rgba(0, 180, 216, 0.4);
+        transform: translateY(-2px);
+    }
+    .form-section-visible { display: block; }
+    .zona-container.hidden { display: none; }
+    .alert {
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 12px;
+        font-weight: bold;
+        text-align: center;
+        font-size: 1em;
+        border: 1px solid transparent;
+    }
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border-color: #c3e6cb;
+    }
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border-color: #f5c6cb;
+    }
+</style>
+{% endblock %}
 
-    <style>
-        /* Oculta el contenedor de Zona/Estanque si no es necesario */
-        .zona-container.hidden {
-            display: none;
-        }
+{% block header_actions %}
+<a href="{% url 'reporte_santa_juana' %}" class="header-btn">
+    <i class="fas fa-list"></i> Ver Reportes
+</a>
+{% endblock %}
 
-        /* Estilos para las alertas de JS (usa las clases de tu CSS) */
-        .alert {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 12px; /* Mismo radio que tus secciones */
-            font-weight: bold;
-            text-align: center;
-            font-size: 1em;
-            border: 1px solid transparent;
-        }
-        .alert-success {
-            background-color: #d4edda;
-            color: #155724;
-            border-color: #c3e6cb;
-        }
-        .alert-danger {
-            background-color: #f8d7da;
-            color: #721c24;
-            border-color: #f5c6cb;
-        }
-    </style>
-</head>
-<body>
-
-    <div class="page-layout">
-        
-        <div class="form-container">
-            
-            <img src="{% static 'imagenes/logo-reporte-cermaq.png' %}" alt="Logo Reporte de Incidencias CERMAQ" class="form-logo">
-            
-            <h1>{% if incidencia_a_editar %}Editar Incidencia{% else %}Formulario de Incidencia{% endif %} - Centro Santa Juana</h1>
-
-            <div id="alerta-container" style="margin-bottom: 20px;"></div>
-
-            <form id="incidenciaForm" 
-                  data-centro-slug="{{ centro_actual_slug|safe }}" 
-                  data-api-url="{% url 'api-registrar-incidencia' %}"
-                  data-update-url="{% if incidencia_a_editar %}{% url 'api-update-incidencia' incidencia_a_editar.pk %}{% endif %}"
-                  data-incidencia-id="{{ incidencia_a_editar.pk|default:'' }}"
-                  data-home-url="{% url 'home' %}">
-                
-                {% csrf_token %}
-                <input type="hidden" id="id_centro_hidden" name="centro" value="">
-
-                <div class="form-section">
-                    <h2>1. Información Básica del Reporte</h2>
-                    <div class="form-group">
-                        <label for="fecha_hora">Fecha y Hora:</label>
-                        <input type="datetime-local" id="fecha_hora" name="fecha_hora" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="turno">Turno:</label>
-                        <select id="turno" name="turno" required>
-                            <option value="" disabled selected>Seleccione Turno</option>
-                            <option value="Mañana">Mañana</option>
-                            <option value="Tarde">Tarde</option>
-                            <option value="Noche">Noche</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h2>2. Ubicación y Falla</h2>
-                    <div class="form-group">
-                        <label for="lugar">Lugar:</label>
-                        <select id="lugar" name="modulo" required>
-                            <option value="" disabled selected>Seleccione Lugar</option>
-                        </select>
-                    </div>
-                    <div class="form-group zona-container" id="zona-container">
-                        <label for="zona">Zona (Estanque):</label>
-                        <select id="zona" name="estanque" required>
-                            <option value="" disabled selected>Seleccione Zona</option>
-                        </select>
-                        
-                        <!-- Checkbox para Incidencia General -->
-                        <div style="margin-top: 12px;">
-                            <input type="checkbox" id="afecta_todo_modulo" name="afecta_todo_modulo">
-                            <label for="afecta_todo_modulo" style="font-weight: bold; color: #d9534f;">
-                                🚨 Incidencia General (Afecta todo el Módulo)
-                            </label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="equipo">Equipo:</label>
-                        <select id="equipo" name="equipo" required disabled>
-                            <option value="" disabled selected>Seleccione Equipo</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="sistema">Sistema:</label>
-                        <select id="sistema" name="tipo_incidencia" required disabled>
-                            <option value="" disabled selected>Seleccione Sistema</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="tipo_falla">Tipo de Falla (Detalle):</label>
-                        <select id="tipo_falla" name="tipo_incidencia_normalizada" required disabled>
-                            <option value="" disabled selected>Seleccione Falla</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h2>3. Impacto y Observaciones</h2>
-                    <div class="form-group">
-                        <label>Riesgo Peces:</label>
-                        <select id="riesgo_peces" name="riesgo_peces" required>
-                            <option value="" disabled selected>Seleccione</option>
-                            <option value="true">Sí</option>
-                            <option value="false">No</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Riesgo Personas:</label>
-                        <select id="riesgo_personas" name="riesgo_personas" required>
-                            <option value="" disabled selected>Seleccione</option>
-                            <option value="true">Sí</option>
-                            <option value="false">No</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Pérdida Económica:</label>
-                        <select id="perdida_economica" name="perdida_economica" required>
-                            <option value="" disabled selected>Seleccione</option>
-                            <option value="true">Sí</option>
-                            <option value="false">No</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="operario_contacto">Operario Contacto:</label>
-                        <select id="operario_contacto" name="operario_contacto">
-                            <option value="">Seleccione operario</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="tiempo_resolucion">Tiempo Resolución (Minutos):</label>
-                        <input type="number" id="tiempo_resolucion" name="tiempo_resolucion" placeholder="Opcional">
-                    </div>
-                    <div class="form-group full-width">
-                        <label for="observacion">Observaciones:</label>
-                        <textarea id="observacion" name="observacion" rows="3" placeholder="Detalle la causa, acciones tomadas..."></textarea>
-                    </div>
-                </div>
-                
-                <button type="submit" id="submitForm">
-                    {% if incidencia_a_editar %}
-                        Actualizar Incidencia
-                    {% else %}
-                        Registrar Incidencia
-                    {% endif %}
-                </button>
-            </form>
-        </div>
-
-        <!-- Sidebar de Acciones -->
-        <div class="sidebar-actions">
-            <h4>🛠️ Acciones</h4>
-            
-            <div class="action-group">
-                <span>Reportes</span>
-                <button type="button" class="action-primary" onclick="window.location.href='{% url 'reporte' %}'">📋 Ver Reportes</button>
-            </div>
-            
-            <div class="action-group">
-                <span>Dashboards</span>
-                <button onclick="window.location.href='{% url 'dashboard' %}'">📈 General</button>
-            </div>
-            
-            <div class="action-group">
-                <span>Navegación</span>
-                <button onclick="window.location.href='{% url 'home' %}'">🏠 Inicio</button>
-            </div>
-            
-            <div class="action-group">
-                <span>Sesión</span>
-                <form method="post" action="{% url 'logout' %}" style="width: 100%;">
-                    {% csrf_token %}
-                    <button type="submit" style="background: #e74c3c;">🔒 Cerrar Sesión</button>
-                </form>
-            </div>
-        </div>
-        
+{% block content %}
+<div class="form-container">
+    <div style="text-align: right; margin-bottom: 20px;">
+        <img src="{% static 'imagenes/logo-reporte-cermaq.png' %}" alt="Logo" class="form-logo">
     </div>
 
-    {{ datos_operarios_json|json_script:"operarios-data" }}
-    
-    <script id="centros-data" type="application/json">
-        [
-            {% for centro in centros %}
-                { "id": "{{ centro.id }}", "nombre": "{{ centro.nombre }}", "slug": "{{ centro.nombre|lower|slugify }}" }{% if not forloop.last %},{% endif %}
-            {% endfor %}
-        ]
-    </script>
+    <div id="alerta-container" style="margin-bottom: 20px;"></div>
 
-    <script id="incidencia-data" type="application/json">
-        {{ incidencia_a_editar_json|safe }}
-    </script>
+    <form id="incidenciaForm" 
+          data-centro-slug="{{ centro_actual_slug|safe }}" 
+          data-api-url="{% url 'api-registrar-incidencia' %}"
+          data-update-url="{% if incidencia_a_editar %}{% url 'api-update-incidencia' incidencia_a_editar.pk %}{% endif %}"
+          data-incidencia-id="{{ incidencia_a_editar.pk|default:'' }}"
+          data-home-url="{% url 'home' %}">
+        
+        {% csrf_token %}
+        <input type="hidden" id="id_centro_hidden" name="centro" value="">
 
-    <script src="{% static 'js/formulario_sj.js' %}" defer></script>
-</body>
-</html>
+        <section class="form-section" id="section-info-basica">
+            <h2>1. Información Básica del Reporte</h2>
+            <div class="form-group">
+                <label for="fecha_hora">Fecha y Hora:</label>
+                <input type="datetime-local" id="fecha_hora" name="fecha_hora" required>
+            </div>
+            <div class="form-group">
+                <label for="turno">Turno:</label>
+                <select id="turno" name="turno" required>
+                    <option value="" disabled selected>Seleccione un turno</option>
+                    <option value="Mañana">Mañana</option>
+                    <option value="Tarde">Tarde</option>
+                    <option value="Noche">Noche</option>
+                </select>
+            </div>
+        </section>
+
+        <section class="form-section" id="section-ubicacion">
+            <h2>2. Ubicación y Falla</h2>
+            <div class="form-group">
+                <label for="lugar">Lugar:</label>
+                <select id="lugar" name="modulo" required>
+                    <option value="" disabled selected>Seleccione Lugar</option>
+                </select>
+            </div>
+            <div class="form-group zona-container" id="zona-container">
+                <label for="zona">Zona (Estanque):</label>
+                <select id="zona" name="estanque" required>
+                    <option value="" disabled selected>Seleccione Zona</option>
+                </select>
+                <div style="margin-top: 12px;">
+                    <input type="checkbox" id="afecta_todo_modulo" name="afecta_todo_modulo">
+                    <label for="afecta_todo_modulo" style="font-weight: bold; color: #d9534f; display: inline;">
+                        🚨 Incidencia General (Afecta todo el Módulo)
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="equipo">Equipo:</label>
+                <select id="equipo" name="equipo" required disabled>
+                    <option value="" disabled selected>Seleccione Equipo</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="sistema">Sistema:</label>
+                <select id="sistema" name="tipo_incidencia" required disabled>
+                    <option value="" disabled selected>Seleccione Sistema</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="tipo_falla">Tipo de Falla (Detalle):</label>
+                <select id="tipo_falla" name="tipo_incidencia_normalizada" required disabled>
+                    <option value="" disabled selected>Seleccione Falla</option>
+                </select>
+            </div>
+        </section>
+
+        <section class="form-section" id="section-impacto">
+            <h2>3. Impacto y Observaciones</h2>
+            <div class="form-group">
+                <label>Riesgo Peces:</label>
+                <select id="riesgo_peces" name="riesgo_peces" required>
+                    <option value="" disabled selected>Seleccione</option>
+                    <option value="true">Sí</option>
+                    <option value="false">No</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Riesgo Personas:</label>
+                <select id="riesgo_personas" name="riesgo_personas" required>
+                    <option value="" disabled selected>Seleccione</option>
+                    <option value="true">Sí</option>
+                    <option value="false">No</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Pérdida Económica:</label>
+                <select id="perdida_economica" name="perdida_economica" required>
+                    <option value="" disabled selected>Seleccione</option>
+                    <option value="true">Sí</option>
+                    <option value="false">No</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="operario_contacto">Operario Contacto:</label>
+                <select id="operario_contacto" name="operario_contacto">
+                    <option value="">Seleccione operario</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="tiempo_resolucion">Tiempo Resolución (Minutos):</label>
+                <input type="number" id="tiempo_resolucion" name="tiempo_resolucion" placeholder="Opcional">
+            </div>
+            <div class="form-group">
+                <label for="observacion">Observaciones:</label>
+                <textarea id="observacion" name="observacion" rows="3" placeholder="Detalle la causa, acciones tomadas..."></textarea>
+            </div>
+        </section>
+        
+        <button type="submit" id="submitForm">
+            {% if incidencia_a_editar %}
+                Actualizar Incidencia
+            {% else %}
+                Registrar Incidencia
+            {% endif %}
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ datos_operarios_json|json_script:"operarios-data" }}
+
+<script id="centros-data" type="application/json">
+    [
+        {% for centro in centros %}
+            { "id": "{{ centro.id }}", "nombre": "{{ centro.nombre }}", "slug": "{{ centro.nombre|lower|slugify }}" }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]
+</script>
+
+<script id="incidencia-data" type="application/json">
+    {{ incidencia_a_editar_json|safe }}
+</script>
+
+<script src="{% static 'js/formulario_sj.js' %}" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fechaHoraInput = document.getElementById('fecha_hora');
+    if (fechaHoraInput && !fechaHoraInput.value) {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        const localTime = new Date(now.getTime() - offset);
+        fechaHoraInput.value = localTime.toISOString().slice(0, 16);
+    }
+});
+</script>
+{% endblock %}

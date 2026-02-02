@@ -1,7 +1,7 @@
 # incidencias/views.py (Versión Revertida a PCC)
 
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Centro, Operario, Incidencia
+from .models import Centro, Operario, Incidencia, ReportePlataforma, SensorConfig, MonitoreoSensores
 import json
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -11,11 +11,23 @@ from django.contrib.auth.decorators import login_required # IMPORTADO
 
 # --- IMPORTACIONES ADICIONALES (Limpias) ---
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.db.models import Count, Q, Avg # Quitamos 'F' que no se usa aquí
 from django.db.models.functions import TruncDate, TruncMonth 
 from .serializers import IncidenciaSerializer
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger 
+import pytz
+
+# --- IMPORTACIONES PARA PDF ---
+from django.http import HttpResponse, JsonResponse
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from io import BytesIO
+from django.views.decorators.http import require_http_methods
 # ---
 
 # DATOS FIJOS DE MÓDULOS (Original)
@@ -50,17 +62,28 @@ DATOS_MODULOS_ESTANQUES = {
     "rahue": {}, "esperanza": {}, "hueyusca": {}, "pcc": {}
 }
 
+# --- VISTA 0: LANDING PAGE (PÁGINA DE BIENVENIDA PÚBLICA) ---
+def vista_landing(request):
+    """
+    Página de bienvenida pública con carrusel de imágenes.
+    Si el usuario ya está autenticado, redirige al panel principal.
+    """
+    if request.user.is_authenticated:
+        return redirect('home')
+    return render(request, 'landing.html')
+
+
 # --- VISTA 1: EL SELECTOR DE CENTROS (NUEVA PÁGINA DE INICIO) ---
 @login_required
 def vista_selector_centro(request):
     """
-    Renderiza la nueva página principal para elegir entre PCC o Santa Juana.
+    Renderiza el panel principal con menú lateral profesional.
     Si el usuario NO es admin (staff), lo redirige directo al dashboard.
     """
     if not request.user.is_staff:
         return redirect('dashboard')
         
-    return render(request, 'seleccionar_centro.html')
+    return render(request, 'panel_principal.html')
 
 
 # --- VISTA INTELIGENTE: Redirige al formulario correcto según el centro ---
@@ -199,7 +222,9 @@ def vista_formulario_pcc(request, pk=None):
             'tipo_incidencia_normalizada': incidencia_a_editar.tipo_incidencia_normalizada,
         })
     
-    todos_los_centros = Centro.objects.all().order_by('nombre')
+    # Solo centros PCC: trafun, cipreses, liquine
+    # (filtramos por id/slug para evitar problemas de encoding con tildes)
+    todos_los_centros = Centro.objects.filter(id__in=['trafun', 'cipreses', 'liquine']).order_by('nombre')
     operarios_por_centro = {}
     operarios = Operario.objects.select_related('centro').all()
     for op in operarios:
@@ -230,9 +255,28 @@ def vista_formulario_pcc(request, pk=None):
 @login_required
 def vista_reporte(request):
     
-    lista_de_incidencias = Incidencia.objects.select_related(
-        'centro', 'operario_contacto'
-    ).all().order_by('-fecha_hora')
+    # Determinar el contexto del formulario (de dónde viene el usuario)
+    formulario_contexto = request.GET.get('formulario', None)
+    
+    # Filtrar centros según el contexto
+    if formulario_contexto == 'pcc':
+        # PCC solo muestra: trafun, liquine, cipreses
+        centros_permitidos = Centro.objects.filter(id__in=['trafun', 'liquine', 'cipreses'])
+        lista_de_incidencias = Incidencia.objects.select_related(
+            'centro', 'operario_contacto'
+        ).filter(centro_id__in=['trafun', 'liquine', 'cipreses']).order_by('-fecha_hora')
+    elif formulario_contexto == 'santa_juana':
+        # Santa Juana solo muestra: Santa Juana
+        centros_permitidos = Centro.objects.filter(nombre='Santa Juana')
+        lista_de_incidencias = Incidencia.objects.select_related(
+            'centro', 'operario_contacto'
+        ).filter(centro__nombre='Santa Juana').order_by('-fecha_hora')
+    else:
+        # Vista general - muestra todos
+        centros_permitidos = Centro.objects.all()
+        lista_de_incidencias = Incidencia.objects.select_related(
+            'centro', 'operario_contacto'
+        ).all().order_by('-fecha_hora')
     
     filtro_fecha = request.GET.get('fecha', None)
     filtro_turno = request.GET.get('turno', None)
@@ -240,7 +284,19 @@ def vista_reporte(request):
     filtro_tipo = request.GET.get('tipo', None)
 
     if filtro_fecha:
-        lista_de_incidencias = lista_de_incidencias.filter(fecha_hora__date=filtro_fecha)
+        from datetime import datetime as dt
+        from django.utils import timezone
+        try:
+            fecha_obj = dt.strptime(filtro_fecha, '%Y-%m-%d')
+            # Crear fechas con timezone para compatibilidad con USE_TZ=True
+            fecha_inicio = timezone.make_aware(fecha_obj.replace(hour=0, minute=0, second=0))
+            fecha_fin = timezone.make_aware(fecha_obj.replace(hour=23, minute=59, second=59))
+            lista_de_incidencias = lista_de_incidencias.filter(
+                fecha_hora__gte=fecha_inicio,
+                fecha_hora__lte=fecha_fin
+            )
+        except Exception:
+            pass  # Invalid date format or timezone error, skip filter
     if filtro_turno:
         lista_de_incidencias = lista_de_incidencias.filter(turno=filtro_turno)
     if filtro_centro:
@@ -248,7 +304,7 @@ def vista_reporte(request):
     if filtro_tipo:
         lista_de_incidencias = lista_de_incidencias.filter(tipo_incidencia=filtro_tipo)
 
-    todos_los_centros = Centro.objects.all().order_by('nombre')
+    todos_los_centros = centros_permitidos.order_by('nombre')
     
     # Paginación: 15 incidencias por página
     paginator = Paginator(lista_de_incidencias, 15)
@@ -279,14 +335,78 @@ def vista_reporte(request):
     return render(request, 'reporte.html', contexto)
 
 
+# --- VISTA: REPORTE SANTA JUANA (Separado del PCC) ---
+@login_required
+def vista_reporte_santa_juana(request):
+    """Vista de reportes exclusiva para el centro Santa Juana"""
+    from datetime import datetime as dt
+    
+    # Solo incidencias de Santa Juana
+    lista_de_incidencias = Incidencia.objects.select_related(
+        'centro', 'operario_contacto'
+    ).filter(centro__nombre='Santa Juana').order_by('-fecha_hora')
+    
+    filtro_fecha = request.GET.get('fecha', None)
+    filtro_turno = request.GET.get('turno', None)
+    filtro_tipo = request.GET.get('tipo', None)
+
+    if filtro_fecha:
+        try:
+            fecha_obj = dt.strptime(filtro_fecha, '%Y-%m-%d')
+            fecha_inicio = timezone.make_aware(fecha_obj.replace(hour=0, minute=0, second=0))
+            fecha_fin = timezone.make_aware(fecha_obj.replace(hour=23, minute=59, second=59))
+            lista_de_incidencias = lista_de_incidencias.filter(
+                fecha_hora__gte=fecha_inicio,
+                fecha_hora__lte=fecha_fin
+            )
+        except Exception:
+            pass
+    if filtro_turno:
+        lista_de_incidencias = lista_de_incidencias.filter(turno=filtro_turno)
+    if filtro_tipo:
+        lista_de_incidencias = lista_de_incidencias.filter(tipo_incidencia=filtro_tipo)
+    
+    # Paginación: 15 incidencias por página
+    paginator = Paginator(lista_de_incidencias, 15)
+    page = request.GET.get('page', 1)
+    
+    try:
+        incidencias_paginadas = paginator.page(page)
+    except PageNotAnInteger:
+        incidencias_paginadas = paginator.page(1)
+    except EmptyPage:
+        incidencias_paginadas = paginator.page(paginator.num_pages)
+    
+    contexto = {
+        'incidencias': incidencias_paginadas,
+        'filtros_aplicados': request.GET,
+        'es_admin': request.user.is_staff,
+        'total_incidencias': paginator.count,
+        'active_menu': 'reporte_santa_juana',
+    }
+    
+    return render(request, 'reporte_santa_juana.html', contexto)
+
+
 # --- VISTA 3: DASHBOARD (Original) ---
 @login_required
 def vista_dashboard(request):
     
     periodo_filtro = request.GET.get('periodo', 'all')
     centro_filtro = request.GET.get('centro', None)
+    formulario_contexto = request.GET.get('formulario', None)
 
-    base_query = Incidencia.objects.all()
+    # Filtrar por contexto del formulario
+    if formulario_contexto == 'pcc':
+        # PCC: solo Trafún, Liquiñe, Cipreses
+        base_query = Incidencia.objects.filter(centro__nombre__in=['Trafún', 'Liquiñe', 'Cipreses'])
+    elif formulario_contexto == 'santa_juana':
+        # Santa Juana: solo Santa Juana
+        base_query = Incidencia.objects.filter(centro__nombre='Santa Juana')
+    else:
+        # Vista general
+        base_query = Incidencia.objects.all()
+    
     fecha_limite = None
     if periodo_filtro == 'week':
         fecha_limite = timezone.now() - timedelta(days=7)
@@ -318,8 +438,15 @@ def vista_dashboard(request):
         .values('dia') \
         .annotate(count=Count('id')) \
         .order_by('dia')
-    chart_tendencia_labels = [item['dia'].strftime('%Y-%m-%d') for item in chart_tendencia_query]
-    chart_tendencia_data = [item['count'] for item in chart_tendencia_query]
+    chart_tendencia_labels = []
+    chart_tendencia_data = []
+    for item in chart_tendencia_query:
+        try:
+            if item['dia']:
+                chart_tendencia_labels.append(item['dia'].strftime('%Y-%m-%d'))
+                chart_tendencia_data.append(item['count'])
+        except:
+            pass
 
     modulos_count = base_query.filter(tipo_incidencia='modulos').count()
     sensores_count = base_query.filter(tipo_incidencia='sensores').count()
@@ -409,11 +536,13 @@ def vista_dashboard(request):
     chart_categorias_data = list(conteo_categorias.values())
     # ---------------------------------------------
 
-    # Calcular KPIs (simulado para el ejemplo)
-    centros = Centro.objects.all()
+    # Filtrar centros disponibles - SOLO Trafún, Cipreses, Liquiñe
+    centros_disponibles = Centro.objects.filter(nombre__in=['Trafún', 'Liquiñe', 'Cipreses'])
+    
+    # Calcular KPIs solo para centros del contexto
     kpi_lista_final = []
     
-    for c in centros:
+    for c in centros_disponibles:
         total_c = base_query.filter(centro=c).count()
         en_kpi = base_query.filter(centro=c, tiempo_resolucion__lte=20).count()
         porcentaje = 0
@@ -453,7 +582,7 @@ def vista_dashboard(request):
         'chart_categorias_data_json': json.dumps(chart_categorias_data),
         
         'kpi_data': kpi_lista_final,
-        'centros': Centro.objects.all().order_by('nombre'),
+        'centros': centros_disponibles.order_by('nombre'),
         'filtros_aplicados': request.GET,
         'es_admin': request.user.is_staff
     }
@@ -1051,7 +1180,7 @@ def dashboard_profesional(request):
     # Datos para gráfico de dona (distribución de tipos)
     tipos_stats = incidencias.values('tipo_incidencia_normalizada').annotate(
         count=Count('id')
-    ).order_by('-count')[:8]  # Top 8 tipos
+    ).order_by('-count')  # Todos los tipos
     
     tipos_labels = [t['tipo_incidencia_normalizada'] or 'Sin clasificar' for t in tipos_stats]
     tipos_data = [t['count'] for t in tipos_stats]
@@ -1059,14 +1188,26 @@ def dashboard_profesional(request):
     # Datos para gráfico de tendencia temporal (últimos 12 meses)
     from datetime import datetime, timedelta
     fecha_inicio = timezone.now() - timedelta(days=365)
-    tendencia_stats = incidencias.filter(fecha_hora__gte=fecha_inicio).annotate(
-        mes=TruncDate('fecha_hora')
-    ).values('mes').annotate(
-        count=Count('id')
-    ).order_by('mes')
     
-    tendencia_labels = [t['mes'].strftime('%b %Y') for t in tendencia_stats]
-    tendencia_data = [t['count'] for t in tendencia_stats]
+    try:
+        tendencia_stats = list(incidencias.filter(fecha_hora__gte=fecha_inicio).annotate(
+            mes=TruncDate('fecha_hora')
+        ).values('mes').annotate(
+            count=Count('id')
+        ).order_by('mes'))
+        
+        tendencia_labels = []
+        tendencia_data = []
+        for t in tendencia_stats:
+            if t['mes']:
+                try:
+                    tendencia_labels.append(t['mes'].strftime('%b %Y'))
+                    tendencia_data.append(t['count'])
+                except:
+                    pass
+    except Exception:
+        tendencia_labels = []
+        tendencia_data = []
     
     # Datos para gráfico de tiempo de resolución promedio por centro
     resolucion_data = []
@@ -1148,16 +1289,29 @@ def dashboard_profesional(request):
     from datetime import datetime, timedelta
     fecha_6_meses = timezone.now() - timedelta(days=180)
     
-    mejora_mensual = incidencias.filter(fecha_hora__gte=fecha_6_meses).annotate(
-        mes=TruncMonth('fecha_hora')
-    ).values('mes').annotate(
-        total=Count('id'),
-        tiempo_promedio=Avg('tiempo_resolucion')
-    ).order_by('mes')
-    
-    mejora_labels = [m['mes'].strftime('%b %Y') for m in mejora_mensual]
-    mejora_total = [m['total'] for m in mejora_mensual]
-    mejora_tiempo = [round(m['tiempo_promedio'], 1) if m['tiempo_promedio'] else 0 for m in mejora_mensual]
+    try:
+        mejora_mensual = list(incidencias.filter(fecha_hora__gte=fecha_6_meses).annotate(
+            mes=TruncMonth('fecha_hora')
+        ).values('mes').annotate(
+            total=Count('id'),
+            tiempo_promedio=Avg('tiempo_resolucion')
+        ).order_by('mes'))
+        
+        mejora_labels = []
+        mejora_total = []
+        mejora_tiempo = []
+        for m in mejora_mensual:
+            if m['mes']:
+                try:
+                    mejora_labels.append(m['mes'].strftime('%b %Y'))
+                    mejora_total.append(m['total'])
+                    mejora_tiempo.append(round(m['tiempo_promedio'], 1) if m['tiempo_promedio'] else 0)
+                except:
+                    pass
+    except Exception:
+        mejora_labels = []
+        mejora_total = []
+        mejora_tiempo = []
     
     # 4. Análisis de Recurrencia (incidencias repetidas en mismo estanque/módulo)
     incidencias_recurrentes = 0
@@ -1382,3 +1536,1421 @@ def dashboard_profesional(request):
     }
     
     return render(request, 'dashboard_profesional.html', context)
+
+
+# ============================================================================
+# SISTEMA DE MONITOREO DE SENSORES (IDEAL CONTROL)
+# ============================================================================
+
+@login_required
+def vista_monitoreo_sensores(request):
+    """Vista principal del formulario de monitoreo de sensores"""
+    centros = Centro.objects.all().order_by('nombre')
+    
+    contexto = {
+        'centros': centros,
+        'fecha_hoy': timezone.now().date(),
+    }
+    
+    return render(request, 'monitoreo_sensores.html', contexto)
+
+
+@login_required
+def vista_consulta_sensores(request):
+    """Vista para consultar reportes de sensores registrados (similar a reporte.html)"""
+    # Obtener filtros
+    fecha_filtro = request.GET.get('fecha', '')
+    turno_filtro = request.GET.get('turno', '')
+    centro_filtro = request.GET.get('centro', '')
+    
+    # Query base - SOLO INCIDENCIAS (ALTO/BAJO) para reportes
+    # Los datos NORMALES se mantienen en BD para estadísticas del dashboard
+    registros = MonitoreoSensores.objects.select_related('centro', 'sensor').filter(
+        estado__in=['ALTO', 'BAJO']
+    )
+    
+    # Aplicar filtros
+    if fecha_filtro:
+        registros = registros.filter(fecha=fecha_filtro)
+    
+    if turno_filtro:
+        registros = registros.filter(turno=turno_filtro)
+    
+    if centro_filtro:
+        registros = registros.filter(centro_id=centro_filtro)
+    
+    # Ordenar
+    registros = registros.order_by('-fecha', 'turno', 'centro__nombre', 'sensor__sistema')
+    
+    # Agrupar por fecha y turno
+    reportes_agrupados = {}
+    for registro in registros:
+        key = f"{registro.fecha}_{registro.turno}"
+        if key not in reportes_agrupados:
+            reportes_agrupados[key] = {
+                'fecha': registro.fecha,
+                'hora_inicio': registro.hora_inicio,
+                'turno': registro.turno,
+                'responsable': registro.responsable,
+                'registros': [],
+                'total_sensores': 0,
+                'total_altos': 0,
+                'total_bajos': 0,
+                'total_normales': 0,
+                'centros': set()
+            }
+        
+        reportes_agrupados[key]['registros'].append(registro)
+        reportes_agrupados[key]['total_sensores'] += 1
+        reportes_agrupados[key]['centros'].add(registro.centro.nombre)
+        
+        if registro.estado == 'ALTO':
+            reportes_agrupados[key]['total_altos'] += 1
+        elif registro.estado == 'BAJO':
+            reportes_agrupados[key]['total_bajos'] += 1
+        else:
+            reportes_agrupados[key]['total_normales'] += 1
+    
+    # Convertir a lista y ordenar
+    reportes_lista = []
+    for key, datos in reportes_agrupados.items():
+        datos['centros'] = ', '.join(sorted(datos['centros']))
+        datos['total_incidencias'] = datos['total_altos'] + datos['total_bajos']
+        reportes_lista.append(datos)
+    
+    reportes_lista.sort(key=lambda x: (x['fecha'], x['turno']), reverse=True)
+    
+    # Obtener centros para el filtro
+    centros = Centro.objects.all().order_by('nombre')
+    
+    # Calcular estadísticas globales
+    total_registros = registros.count()
+    total_altos = registros.filter(estado='ALTO').count()
+    total_bajos = registros.filter(estado='BAJO').count()
+    total_normales = registros.filter(estado='NORMAL').count()
+    
+    contexto = {
+        'reportes': reportes_lista,
+        'centros': centros,
+        'total_registros': total_registros,
+        'total_altos': total_altos,
+        'total_bajos': total_bajos,
+        'total_normales': total_normales,
+        'filtros_aplicados': {
+            'fecha': fecha_filtro,
+            'turno': turno_filtro,
+            'centro': centro_filtro,
+        },
+        'es_admin': request.user.is_staff,
+    }
+    
+    return render(request, 'consulta_sensores.html', contexto)
+
+
+@login_required
+def api_obtener_sistemas(request):
+    """API para obtener sistemas disponibles por centro"""
+    centro_id = request.GET.get('centro_id')
+    
+    if not centro_id:
+        return JsonResponse({'error': 'Centro no especificado'}, status=400)
+    
+    try:
+        # Obtener sistemas únicos para este centro
+        sistemas = SensorConfig.objects.filter(
+            centro_id=centro_id,
+            activo=True
+        ).values_list('sistema', flat=True).distinct().order_by('sistema')
+        
+        return JsonResponse({
+            'sistemas': list(sistemas)
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def api_obtener_sensores(request):
+    """API para obtener sensores de un sistema específico"""
+    centro_id = request.GET.get('centro_id')
+    sistema = request.GET.get('sistema')
+    
+    if not centro_id or not sistema:
+        return JsonResponse({'error': 'Parámetros incompletos'}, status=400)
+    
+    try:
+        sensores = SensorConfig.objects.filter(
+            centro_id=centro_id,
+            sistema=sistema,
+            activo=True
+        ).values(
+            'id',
+            'equipo',
+            'tipo_medicion',
+            'limite_min',
+            'limite_max'
+        ).order_by('orden', 'equipo')
+        
+        return JsonResponse({
+            'sensores': list(sensores)
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_guardar_monitoreo(request):
+    """API para guardar el monitoreo completo de sensores"""
+    try:
+        data = json.loads(request.body)
+        
+        fecha = data.get('fecha')
+        hora_inicio = data.get('hora_inicio')
+        turno = data.get('turno')
+        responsable = data.get('responsable')
+        registros = data.get('registros', [])
+        
+        if not all([fecha, turno, responsable, registros]):
+            return JsonResponse({'error': 'Datos incompletos'}, status=400)
+        
+        # Guardar cada registro
+        registros_guardados = 0
+        for reg in registros:
+            MonitoreoSensores.objects.update_or_create(
+                fecha=fecha,
+                turno=turno,
+                centro_id=reg['centro_id'],
+                sensor_id=reg['sensor_id'],
+                defaults={
+                    'hora_inicio': hora_inicio if hora_inicio else None,
+                    'estado': reg['estado'],
+                    'observacion': reg.get('observacion', ''),
+                    'responsable': responsable
+                }
+            )
+            registros_guardados += 1
+        
+        return JsonResponse({
+            'success': True,
+            'mensaje': f'{registros_guardados} sensores registrados correctamente',
+            'registros_guardados': registros_guardados
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def api_obtener_reporte_sensores(request):
+    """API para obtener datos del reporte de sensores"""
+    fecha = request.GET.get('fecha')
+    turno = request.GET.get('turno')
+    
+    if not fecha or not turno:
+        return JsonResponse({'error': 'Fecha y turno requeridos'}, status=400)
+    
+    try:
+        # Obtener todos los registros del día/turno
+        registros = MonitoreoSensores.objects.filter(
+            fecha=fecha,
+            turno=turno
+        ).select_related('centro', 'sensor').order_by('centro__nombre', 'sensor__sistema')
+        
+        datos = []
+        for reg in registros:
+            if reg.estado != 'NORMAL':  # Solo incluir incidencias
+                datos.append({
+                    'fecha': str(reg.fecha),
+                    'piscicultura': reg.centro.nombre,
+                    'sistema': reg.sensor.sistema,
+                    'equipo': reg.sensor.equipo,
+                    'tipo_medicion': reg.sensor.tipo_medicion,
+                    'incidencia': f"LIMITE {reg.sensor.limite_min} - {reg.sensor.limite_max}",
+                    'estado': reg.estado,
+                    'observacion': reg.observacion,
+                    'total_alto': 1 if reg.estado == 'ALTO' else 0,
+                    'total_bajo': 1 if reg.estado == 'BAJO' else 0
+                })
+        
+        return JsonResponse({
+            'success': True,
+            'registros': datos,
+            'total': len(datos)
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def api_listar_reportes_sensores(request):
+    """API para listar todos los reportes de sensores registrados"""
+    try:
+        # Obtener reportes únicos por fecha y turno
+        reportes = MonitoreoSensores.objects.values(
+            'fecha', 'turno', 'responsable'
+        ).annotate(
+            total_sensores=Count('id'),
+            total_altos=Count('id', filter=Q(estado='ALTO')),
+            total_bajos=Count('id', filter=Q(estado='BAJO')),
+            total_normales=Count('id', filter=Q(estado='NORMAL'))
+        ).order_by('-fecha', 'turno')
+        
+        datos = []
+        for reporte in reportes:
+            # Obtener centros involucrados
+            centros = MonitoreoSensores.objects.filter(
+                fecha=reporte['fecha'],
+                turno=reporte['turno']
+            ).values_list('centro__nombre', flat=True).distinct()
+            
+            datos.append({
+                'fecha': str(reporte['fecha']),
+                'turno': reporte['turno'],
+                'responsable': reporte['responsable'],
+                'total_sensores': reporte['total_sensores'],
+                'total_altos': reporte['total_altos'],
+                'total_bajos': reporte['total_bajos'],
+                'total_normales': reporte['total_normales'],
+                'centros': ', '.join(centros)
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'reportes': datos,
+            'total': len(datos)
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def api_detalle_reporte_sensores(request):
+    """API para obtener el detalle completo de un reporte específico"""
+    fecha = request.GET.get('fecha')
+    turno = request.GET.get('turno')
+    
+    if not fecha or not turno:
+        return JsonResponse({'error': 'Fecha y turno requeridos'}, status=400)
+    
+    try:
+        registros = MonitoreoSensores.objects.filter(
+            fecha=fecha,
+            turno=turno
+        ).select_related('centro', 'sensor').order_by('centro__nombre', 'sensor__sistema', 'sensor__equipo')
+        
+        if not registros.exists():
+            return JsonResponse({'error': 'Reporte no encontrado'}, status=404)
+        
+        datos = []
+        for reg in registros:
+            datos.append({
+                'id': reg.id,
+                'centro': reg.centro.nombre,
+                'sistema': reg.sensor.sistema,
+                'equipo': reg.sensor.equipo,
+                'tipo_medicion': reg.sensor.tipo_medicion,
+                'limite_min': reg.sensor.limite_min,
+                'limite_max': reg.sensor.limite_max,
+                'estado': reg.estado,
+                'observacion': reg.observacion,
+                'responsable': reg.responsable,
+                'creado_en': reg.creado_en.strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'fecha': fecha,
+            'turno': turno,
+            'registros': datos,
+            'total': len(datos)
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# --- DASHBOARD DE SENSORES ---
+@login_required
+def dashboard_sensores(request):
+    """
+    Dashboard profesional para el sistema de monitoreo de sensores
+    """
+    from django.db.models import Count
+    from django.db.models.functions import TruncDate
+    import json
+    
+    # Filtros
+    periodo_filtro = request.GET.get('periodo', 'all')
+    centro_filtro = request.GET.get('centro', None)
+    
+    # Query base
+    base_query = MonitoreoSensores.objects.all()
+    
+    # Filtrar por periodo
+    fecha_limite = None
+    if periodo_filtro == 'week':
+        fecha_limite = timezone.now() - timedelta(days=7)
+    elif periodo_filtro == 'month':
+        fecha_limite = timezone.now() - timedelta(days=30)
+    elif periodo_filtro == 'quarter':
+        fecha_limite = timezone.now() - timedelta(days=90)
+    
+    if fecha_limite:
+        base_query = base_query.filter(creado_en__gte=fecha_limite)
+    if centro_filtro:
+        base_query = base_query.filter(centro_id=centro_filtro)
+    
+    # Estadísticas principales
+    total_registros = base_query.count()
+    total_incidencias = base_query.filter(estado__in=['ALTO', 'BAJO']).count()
+    total_normales = base_query.filter(estado='NORMAL').count()
+    total_altos = base_query.filter(estado='ALTO').count()
+    total_bajos = base_query.filter(estado='BAJO').count()
+    
+    # Porcentaje de cumplimiento (sensores normales)
+    porcentaje_cumplimiento = int((total_normales / total_registros * 100)) if total_registros > 0 else 0
+    
+    # Gráfico: Incidencias por Centro
+    chart_centro_query = base_query.filter(centro__isnull=False, estado__in=['ALTO', 'BAJO']) \
+        .values('centro__nombre') \
+        .annotate(count=Count('id')) \
+        .order_by('-count')
+    chart_centro_labels = [item['centro__nombre'] for item in chart_centro_query]
+    chart_centro_counts = [item['count'] for item in chart_centro_query]
+    centro_mas_incidencias = chart_centro_labels[0] if chart_centro_labels else "-"
+    
+    # Gráfico: Tendencia temporal
+    chart_tendencia_query = base_query.filter(estado__in=['ALTO', 'BAJO']) \
+        .annotate(dia=TruncDate('creado_en')) \
+        .values('dia') \
+        .annotate(count=Count('id')) \
+        .order_by('dia')
+    chart_tendencia_labels = [item['dia'].strftime('%Y-%m-%d') if item['dia'] else 'Sin fecha' for item in chart_tendencia_query]
+    chart_tendencia_data = [item['count'] for item in chart_tendencia_query]
+    
+    # Gráfico: Distribución por estado
+    chart_estados_data = [total_normales, total_altos, total_bajos]
+    
+    # Gráfico: Incidencias por Sistema
+    chart_sistema_query = base_query.filter(sensor__isnull=False, estado__in=['ALTO', 'BAJO']) \
+        .values('sensor__sistema') \
+        .annotate(count=Count('id')) \
+        .order_by('-count')[:10]
+    chart_sistema_labels = [item['sensor__sistema'] for item in chart_sistema_query]
+    chart_sistema_data = [item['count'] for item in chart_sistema_query]
+    
+    # KPIs por Centro
+    centros_disponibles = Centro.objects.all()
+    kpi_lista_final = []
+    
+    for c in centros_disponibles:
+        total_c = base_query.filter(centro=c).count()
+        normales_c = base_query.filter(centro=c, estado='NORMAL').count()
+        incidencias_c = base_query.filter(centro=c, estado__in=['ALTO', 'BAJO']).count()
+        porcentaje = int((normales_c / total_c * 100)) if total_c > 0 else 0
+        
+        kpi_lista_final.append({
+            'centro_nombre': c.nombre,
+            'total_sensores': total_c,
+            'normales': normales_c,
+            'incidencias': incidencias_c,
+            'porcentaje': porcentaje,
+            'cumple_meta': porcentaje >= 80
+        })
+    
+    contexto = {
+        'total_registros': total_registros,
+        'total_incidencias': total_incidencias,
+        'total_normales': total_normales,
+        'total_altos': total_altos,
+        'total_bajos': total_bajos,
+        'porcentaje_cumplimiento': porcentaje_cumplimiento,
+        'centro_mas_incidencias': centro_mas_incidencias,
+        
+        'chart_centro_labels_json': json.dumps(chart_centro_labels),
+        'chart_centro_counts_json': json.dumps(chart_centro_counts),
+        
+        'chart_tendencia_labels_json': json.dumps(chart_tendencia_labels),
+        'chart_tendencia_data_json': json.dumps(chart_tendencia_data),
+        
+        'chart_estados_data_json': json.dumps(chart_estados_data),
+        
+        'chart_sistema_labels_json': json.dumps(chart_sistema_labels),
+        'chart_sistema_data_json': json.dumps(chart_sistema_data),
+        
+        'kpi_data': kpi_lista_final,
+        'centros': centros_disponibles.order_by('nombre'),
+        'filtros_aplicados': request.GET,
+        'es_admin': request.user.is_staff
+    }
+    
+    return render(request, 'dashboard_sensores.html', contexto)
+
+
+# --- APIs PARA EDITAR Y ELIMINAR SENSORES ---
+@csrf_exempt
+@api_view(['DELETE'])
+def api_eliminar_registro_sensor(request, pk):
+    """
+    Elimina un registro de sensor específico
+    """
+    try:
+        registro = MonitoreoSensores.objects.get(pk=pk)
+        registro.delete()
+        return Response({
+            'success': True,
+            'message': 'Registro eliminado correctamente'
+        }, status=status.HTTP_200_OK)
+    except MonitoreoSensores.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Registro no encontrado'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@csrf_exempt
+@api_view(['PUT'])
+def api_actualizar_registro_sensor(request, pk):
+    """
+    Actualiza un registro de sensor específico
+    """
+    try:
+        registro = MonitoreoSensores.objects.get(pk=pk)
+        
+        # Actualizar campos
+        if 'estado' in request.data:
+            registro.estado = request.data['estado']
+        if 'observacion' in request.data:
+            registro.observacion = request.data['observacion']
+        
+        registro.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Registro actualizado correctamente',
+            'registro': {
+                'id': registro.id,
+                'estado': registro.estado,
+                'observacion': registro.observacion
+            }
+        }, status=status.HTTP_200_OK)
+    except MonitoreoSensores.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Registro no encontrado'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@csrf_exempt
+@api_view(['DELETE'])
+def api_eliminar_reporte_completo(request):
+    """
+    Elimina todos los registros de sensores de una fecha y turno específicos
+    """
+    try:
+        fecha = request.GET.get('fecha')
+        turno = request.GET.get('turno')
+        
+        if not fecha or not turno:
+            return Response({
+                'success': False,
+                'message': 'Fecha y turno son requeridos'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Eliminar todos los registros de esa fecha y turno
+        registros = MonitoreoSensores.objects.filter(fecha=fecha, turno=turno)
+        cantidad = registros.count()
+        registros.delete()
+        
+        return Response({
+            'success': True,
+            'message': f'Reporte eliminado correctamente. {cantidad} registros eliminados.'
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ============================================
+# VISTAS PARA REPORTES DE PLATAFORMA
+# ============================================
+
+@login_required
+def vista_reporte_plataformas(request):
+    """Vista para registrar reportes de fallas de plataforma"""
+    centros = Centro.objects.all().order_by('nombre')
+    return render(request, 'reporte_plataformas.html', {
+        'centros': centros
+    })
+
+
+@login_required
+def vista_editar_reporte_plataforma(request, pk):
+    """Vista para editar un reporte de plataforma existente"""
+    reporte = get_object_or_404(ReportePlataforma, pk=pk)
+    centros = Centro.objects.all().order_by('nombre')
+    
+    # Serializar el reporte para pasarlo al JavaScript
+    reporte_data = {
+        'id': reporte.id,
+        'fecha_hora': reporte.fecha_hora.strftime('%Y-%m-%dT%H:%M'),
+        'turno': reporte.turno,
+        'centro_id': reporte.centro.id,
+        'plataforma': reporte.plataforma,
+        'sistema_fallando': reporte.sistema_fallando,
+        'tiempo_fuera_servicio': reporte.tiempo_fuera_servicio,
+        'unidad_tiempo': reporte.unidad_tiempo,
+        'contacto_proveedor': reporte.contacto_proveedor,
+        'razon_caida': reporte.razon_caida,
+        'riesgo_peces': reporte.riesgo_peces,
+        'perdida_economica': reporte.perdida_economica,
+        'responsable': reporte.responsable,
+        'observacion': reporte.observacion
+    }
+    
+    return render(request, 'reporte_plataformas.html', {
+        'centros': centros,
+        'reporte_editar': json.dumps(reporte_data),
+        'editando': True
+    })
+
+
+@login_required
+def vista_consulta_plataformas(request):
+    """Vista para consultar reportes de plataformas registrados"""
+    # Obtener filtros
+    fecha_filtro = request.GET.get('fecha', '')
+    plataforma_filtro = request.GET.get('plataforma', '')
+    centro_filtro = request.GET.get('centro', '')
+    
+    # Query base
+    reportes = ReportePlataforma.objects.select_related('centro').all()
+    
+    # Aplicar filtros
+    if fecha_filtro:
+        reportes = reportes.filter(fecha_hora__date=fecha_filtro)
+    
+    if plataforma_filtro:
+        reportes = reportes.filter(plataforma=plataforma_filtro)
+    
+    if centro_filtro:
+        reportes = reportes.filter(centro_id=centro_filtro)
+    
+    # Ordenar
+    reportes = reportes.order_by('-fecha_hora', '-creado_en')
+    
+    # Paginación
+    paginator = Paginator(reportes, 20)
+    page = request.GET.get('page', 1)
+    
+    try:
+        reportes_paginados = paginator.page(page)
+    except PageNotAnInteger:
+        reportes_paginados = paginator.page(1)
+    except EmptyPage:
+        reportes_paginados = paginator.page(paginator.num_pages)
+    
+    # Obtener centros para el filtro
+    centros = Centro.objects.all().order_by('nombre')
+    
+    context = {
+        'reportes': reportes_paginados,
+        'centros': centros,
+        'fecha_filtro': fecha_filtro,
+        'plataforma_filtro': plataforma_filtro,
+        'centro_filtro': centro_filtro,
+    }
+    
+    return render(request, 'consulta_plataformas.html', context)
+
+
+@api_view(['POST'])
+@csrf_exempt
+def api_guardar_reporte_plataforma(request):
+    """API para guardar o actualizar un reporte de plataforma"""
+    try:
+        data = request.data
+        reporte_id = data.get('id')
+        
+        # Datos del reporte
+        reporte_data = {
+            'fecha_hora': data.get('fecha_hora'),
+            'turno': data.get('turno'),
+            'centro_id': data.get('centro'),
+            'plataforma': data.get('plataforma'),
+            'sistema_fallando': data.get('sistema_fallando'),
+            'tiempo_fuera_servicio': data.get('tiempo_fuera_servicio'),
+            'unidad_tiempo': data.get('unidad_tiempo', 'minutos'),
+            'contacto_proveedor': data.get('contacto_proveedor', 'no'),
+            'razon_caida': data.get('razon_caida'),
+            'riesgo_peces': data.get('riesgo_peces', False),
+            'perdida_economica': data.get('perdida_economica', False),
+            'responsable': data.get('responsable'),
+            'observacion': data.get('observacion', '')
+        }
+        
+        if reporte_id:
+            # Actualizar reporte existente
+            reporte = ReportePlataforma.objects.get(pk=reporte_id)
+            for key, value in reporte_data.items():
+                setattr(reporte, key, value)
+            reporte.save()
+            mensaje = 'Reporte actualizado correctamente'
+        else:
+            # Crear nuevo reporte
+            reporte = ReportePlataforma.objects.create(**reporte_data)
+            mensaje = 'Reporte registrado correctamente'
+        
+        return Response({
+            'success': True,
+            'message': mensaje,
+            'reporte_id': reporte.id
+        }, status=status.HTTP_201_CREATED if not reporte_id else status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@csrf_exempt
+def api_eliminar_reporte_plataforma(request, pk):
+    """API para eliminar un reporte de plataforma"""
+    try:
+        reporte = get_object_or_404(ReportePlataforma, pk=pk)
+        reporte.delete()
+        
+        return Response({
+            'success': True,
+            'message': 'Reporte eliminado correctamente'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@login_required
+def generar_reporte_general_pdf(request):
+    """Genera un reporte consolidado diario estilo ejecutivo con incidencias PCC y alertas de sensores"""
+    import os
+    from django.conf import settings
+    from .models import MonitoreoSensores
+    import pytz
+    from datetime import datetime, timedelta
+    from reportlab.lib.pagesizes import A4, landscape
+    
+    # Obtener parámetros de fecha y turno
+    fecha = request.GET.get('fecha', timezone.now().date())
+    turno = request.GET.get('turno', '')
+    
+    if isinstance(fecha, str):
+        fecha = datetime.strptime(fecha, '%Y-%m-%d').date()
+    
+    # Timezone Chile
+    chile_tz = pytz.timezone('America/Santiago')
+    inicio_dia = chile_tz.localize(datetime.combine(fecha, datetime.min.time()))
+    fin_dia = inicio_dia + timedelta(days=1)
+    
+    # Obtener incidencias PCC
+    incidencias_query = Incidencia.objects.filter(fecha_hora__gte=inicio_dia, fecha_hora__lt=fin_dia)
+    if turno:
+        incidencias_query = incidencias_query.filter(turno=turno)
+    incidencias = incidencias_query.select_related('centro').order_by('centro__nombre', 'fecha_hora')
+    
+    # Obtener alertas de sensores
+    sensores_query = MonitoreoSensores.objects.filter(fecha=fecha, estado__in=['ALTO', 'BAJO'])
+    if turno:
+        turno_map = {'Mañana': 'MAÑANA', 'Tarde': 'TARDE', 'Noche': 'NOCHE'}
+        turno_sensor = turno_map.get(turno, turno.upper())
+        sensores_query = sensores_query.filter(turno=turno_sensor)
+    sensores = sensores_query.select_related('centro', 'sensor').order_by('centro__nombre', 'sensor__sistema')
+    
+    # Estadísticas por turno y centro
+    centros_pcc = ['Liquiñe', 'Cipreses', 'Trafún']
+    turnos_data = {'Mañana': 0, 'Tarde': 0, 'Noche': 0}
+    centros_data = {c: {'count': 0, 'turnos': set(), 'estanques': set(), 'fallas': set(), 'incidencias': []} for c in centros_pcc}
+    
+    for inc in incidencias:
+        centro_nombre = inc.centro.nombre if inc.centro else 'Otro'
+        if inc.turno in turnos_data:
+            turnos_data[inc.turno] += 1
+        if centro_nombre in centros_data:
+            centros_data[centro_nombre]['count'] += 1
+            if inc.turno:
+                centros_data[centro_nombre]['turnos'].add(inc.turno)
+            if inc.estanque:
+                centros_data[centro_nombre]['estanques'].add(inc.estanque)
+            centros_data[centro_nombre]['fallas'].add('Estanque en Flushing')
+            hora = inc.fecha_hora.astimezone(chile_tz).strftime('%H:%M') if inc.fecha_hora else '--:--'
+            params = []
+            if inc.oxigeno_nivel:
+                params.append(f"O: {inc.oxigeno_valor or ''} mg/L")
+            if inc.temperatura_nivel:
+                params.append(f"T: {inc.temperatura_valor or ''}")
+            centros_data[centro_nombre]['incidencias'].append({
+                'hora': hora,
+                'modulo': inc.modulo or '',
+                'estanque': inc.estanque or '',
+                'tipo': 'Estanque en Flushing',
+                'tiempo': inc.tiempo_resolucion or '--',
+                'kpi': 'OK' if inc.tiempo_resolucion and inc.tiempo_resolucion <= 20 else 'NO',
+                'parametros': ', '.join(params) if params else '-'
+            })
+    
+    # Crear PDF en formato horizontal
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Reporte_General_{fecha.strftime("%d%m%Y")}.pdf"'
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=15, leftMargin=15, topMargin=15, bottomMargin=15)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    page_width = landscape(A4)[0]
+    
+    # === HEADER ===
+    header_data = [[
+        Paragraph("<b>REPORTE MÓDULO/ESTANQUES Y SENSORES</b>", 
+                  ParagraphStyle('Header', fontSize=14, textColor=colors.white, fontName='Helvetica-Bold')),
+        Paragraph(f"<b>Fecha: {fecha.strftime('%d-%m-%Y')}</b><br/><font size=8>{'Turno: ' + turno if turno else 'Día Completo'}</font>",
+                  ParagraphStyle('HeaderRight', fontSize=10, textColor=colors.white, alignment=2))
+    ]]
+    header_table = Table(header_data, colWidths=[page_width*0.6 - 30, page_width*0.4 - 30])
+    header_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#008B8B')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (-1, -1), 15),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 15),
+    ]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 10))
+    
+    # === KPI BOXES ===
+    total_inc = incidencias.count()
+    kpi_data = [[
+        Paragraph(f"<font size=7>TOTAL</font><br/><b><font size=14>{total_inc}</font></b>", ParagraphStyle('KPI', alignment=1)),
+        Paragraph(f"<font size=7>MAÑANA</font><br/><b><font size=14>{turnos_data['Mañana']}</font></b>", ParagraphStyle('KPI', alignment=1)),
+        Paragraph(f"<font size=7>TARDE</font><br/><b><font size=14>{turnos_data['Tarde']}</font></b>", ParagraphStyle('KPI', alignment=1)),
+        Paragraph(f"<font size=7>NOCHE</font><br/><b><font size=14>{turnos_data['Noche']}</font></b>", ParagraphStyle('KPI', alignment=1)),
+        Paragraph(f"<font size=7>ALERTAS SENSORES</font><br/><b><font size=14>{sensores.count()}</font></b>", ParagraphStyle('KPI', alignment=1)),
+    ]]
+    kpi_table = Table(kpi_data, colWidths=[80, 80, 80, 80, 100])
+    kpi_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#F0F0F0')),
+        ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#FFF8DC')),
+        ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#FFE4C4')),
+        ('BACKGROUND', (3, 0), (3, 0), colors.HexColor('#E6E6FA')),
+        ('BACKGROUND', (4, 0), (4, 0), colors.HexColor('#FFE4E1')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(kpi_table)
+    elements.append(Spacer(1, 8))
+    
+    # === RESUMEN POR CENTRO ===
+    elements.append(Paragraph("<b>RESUMEN POR CENTRO</b>", ParagraphStyle('Section', fontSize=9, spaceAfter=4)))
+    
+    centro_cards = []
+    card_width = (page_width - 60) / 3
+    
+    for centro in centros_pcc:
+        data = centros_data[centro]
+        if data['count'] == 0:
+            content = "<font size=7>Sin incidencias</font>"
+        else:
+            content = f"<b><font size=8>{data['count']} incidencia(s)</font></b><br/>"
+            if data['turnos']:
+                content += f"<font size=7><b>Turno:</b> {', '.join(data['turnos'])}</font><br/>"
+            if data['estanques']:
+                est_list = sorted(list(data['estanques']))[:5]
+                content += f"<font size=7><b>Estanques:</b> {', '.join(est_list)}</font><br/>"
+            if data['fallas']:
+                content += f"<font size=7 color='#C75050'><b>Fallas:</b> {list(data['fallas'])[0]}</font>"
+        
+        centro_cards.append([
+            Paragraph(f"<b>{centro.upper()}</b>", ParagraphStyle('CentroHeader', fontSize=8, textColor=colors.white, alignment=1)),
+            Paragraph(content, ParagraphStyle('CentroContent', fontSize=7))
+        ])
+    
+    # Crear tabla de centros
+    centro_table_data = [[centro_cards[0][0], centro_cards[1][0], centro_cards[2][0]],
+                         [centro_cards[0][1], centro_cards[1][1], centro_cards[2][1]]]
+    centro_table = Table(centro_table_data, colWidths=[card_width, card_width, card_width], rowHeights=[18, 55])
+    centro_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#008B8B')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
+        ('VALIGN', (0, 1), (-1, 1), 'TOP'),
+        ('TOPPADDING', (0, 1), (-1, 1), 4),
+        ('LEFTPADDING', (0, 1), (-1, 1), 4),
+    ]))
+    elements.append(centro_table)
+    elements.append(Spacer(1, 8))
+    
+    # === DETALLE DE INCIDENCIAS PCC ===
+    elements.append(Paragraph("<b>DETALLE DE INCIDENCIAS PCC</b>", ParagraphStyle('Section', fontSize=9, spaceAfter=4)))
+    
+    if incidencias.exists():
+        detail_data = [['No.', 'Centro', 'Hora', 'Ubicación', 'Tipo de Incidencia', 'Parámetros Afectados', 'Tiempo', 'KPI']]
+        row_num = 1
+        for centro in centros_pcc:
+            for inc in centros_data[centro]['incidencias'][:10]:
+                ubicacion = f"Módulo {inc['modulo']} / Estanque {inc['estanque']}" if inc['modulo'] else 'N/A'
+                kpi_color = '#2E8B57' if inc['kpi'] == 'OK' else '#C75050'
+                detail_data.append([
+                    str(row_num), centro, inc['hora'], ubicacion[:25], inc['tipo'][:30], 
+                    inc['parametros'][:25], f"{inc['tiempo']} min",
+                    Paragraph(f"<font color='{kpi_color}'><b>{inc['kpi']}</b></font>", styles['Normal'])
+                ])
+                row_num += 1
+        
+        if len(detail_data) > 1:
+            detail_table = Table(detail_data, colWidths=[25, 55, 35, 90, 100, 100, 45, 35])
+            detail_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#008B8B')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 7),
+                ('FONTSIZE', (0, 1), (-1, -1), 6.5),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#E0E0E0')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F9FA')]),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ]))
+            elements.append(detail_table)
+        else:
+            elements.append(Paragraph("<i>No hay incidencias PCC registradas</i>", styles['Normal']))
+    else:
+        elements.append(Paragraph("<i>✓ Sin incidencias PCC registradas</i>", styles['Normal']))
+    
+    elements.append(Spacer(1, 10))
+    
+    # === ALERTAS DE SENSORES ===
+    elements.append(Paragraph("<b>ALERTAS DE SENSORES (IDEAL CONTROL)</b>", ParagraphStyle('Section', fontSize=9, spaceAfter=4)))
+    
+    if sensores.exists():
+        sensor_data = [['Centro', 'Sistema', 'Equipo', 'Estado', 'Observación']]
+        for s in sensores[:15]:
+            estado_color = '#C75050' if s.estado == 'ALTO' else '#D4A574'
+            sensor_data.append([
+                s.centro.nombre, s.sensor.sistema[:25], s.sensor.equipo[:35],
+                Paragraph(f"<font color='{estado_color}'><b>{s.estado}</b></font>", styles['Normal']),
+                (s.observacion[:45] + '...' if s.observacion and len(s.observacion) > 45 else s.observacion) or '-'
+            ])
+        
+        sensor_table = Table(sensor_data, colWidths=[70, 100, 150, 50, 150])
+        sensor_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#008B8B')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 7),
+            ('FONTSIZE', (0, 1), (-1, -1), 6.5),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#E0E0E0')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F9FA')]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        elements.append(sensor_table)
+        elements.append(Paragraph(f"<b>Total: {sensores.count()} alertas</b>", ParagraphStyle('Total', fontSize=8, spaceBefore=4)))
+    else:
+        elements.append(Paragraph("<i>✓ Sin alertas de sensores</i>", styles['Normal']))
+    
+    # === FOOTER ===
+    elements.append(Spacer(1, 15))
+    fecha_gen = timezone.now().astimezone(chile_tz)
+    elements.append(Paragraph(
+        f"<font size=6 color='grey'>Generado automáticamente: {fecha_gen.strftime('%d/%m/%Y %H:%M')} hrs | Sistema de Monitoreo CERMAQ</font>",
+        ParagraphStyle('Footer', alignment=1)
+    ))
+    
+    doc.build(elements)
+    pdf = buffer.getvalue()
+    buffer.close()
+    response.write(pdf)
+    
+    return response
+
+
+@login_required
+def generar_pdf_plataforma(request, pk):
+    """Genera un PDF simple y bonito del reporte de plataforma para enviar por correo"""
+    import os
+    from django.conf import settings
+    
+    reporte = get_object_or_404(ReportePlataforma, pk=pk)
+    
+    # Crear el objeto HttpResponse con el tipo de contenido PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Falla_{reporte.plataforma}_{reporte.fecha_hora.strftime("%d%m%Y")}.pdf"'
+    
+    # Crear el PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=40, bottomMargin=40)
+    
+    # Contenedor para los elementos del PDF
+    elements = []
+    
+    # Estilos
+    styles = getSampleStyleSheet()
+    
+    # Intentar agregar el logo de CERMAQ
+    try:
+        logo_path = os.path.join(settings.BASE_DIR, 'static', 'imagenes', 'logo-reporte-cermaq.png')
+        if os.path.exists(logo_path):
+            logo = Image(logo_path, width=2.5*inch, height=0.8*inch)
+            logo.hAlign = 'CENTER'
+            elements.append(logo)
+            elements.append(Spacer(1, 15))
+    except:
+        pass
+    
+    # Título
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#00457C'),
+        spaceAfter=5,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold'
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'Subtitle',
+        parent=styles['Normal'],
+        fontSize=12,
+        textColor=colors.HexColor('#666666'),
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        fontName='Helvetica'
+    )
+    
+    # Determinar el subtítulo según la plataforma
+    if reporte.plataforma == 'INNOVEX':
+        subtitulo = "Liquiñe / Trafún"
+    elif reporte.plataforma == 'SINPLANT':
+        subtitulo = "Cipreses"
+    elif reporte.plataforma == 'IDEAL CONTROL':
+        subtitulo = f"Centro: {reporte.centro.nombre}"
+    else:
+        subtitulo = reporte.centro.nombre
+    
+    elements.append(Paragraph(f"REPORTE DE FALLA - {reporte.plataforma}", title_style))
+    elements.append(Paragraph(subtitulo, subtitle_style))
+    elements.append(Spacer(1, 10))
+    
+    # Convertir fecha_hora a zona horaria de Chile
+    import pytz
+    chile_tz = pytz.timezone('America/Santiago')
+    fecha_hora_chile = reporte.fecha_hora.astimezone(chile_tz) if timezone.is_aware(reporte.fecha_hora) else chile_tz.localize(reporte.fecha_hora)
+    
+    # Determinar el texto del contacto con proveedor
+    contacto_texto = {
+        'no': '✗ No se contactó',
+        'si': '✓ Sí, con respuesta',
+        'sin_respuesta': '⚠ Sí, sin respuesta'
+    }.get(reporte.contacto_proveedor, '✗ No se contactó')
+    
+    # Tabla principal con diseño bonito y profesional
+    # Determinar la unidad de tiempo
+    unidad = 'días' if reporte.unidad_tiempo == 'dias' else 'minutos'
+    
+    data = [
+        ['FECHA Y HORA', fecha_hora_chile.strftime('%d/%m/%Y - %H:%M hrs')],
+        ['TURNO', reporte.turno],
+        ['', ''],
+        ['SISTEMA AFECTADO', reporte.sistema_fallando],
+        ['TIEMPO FUERA', f'{reporte.tiempo_fuera_servicio} {unidad}'],
+        ['CONTACTO PROVEEDOR', contacto_texto],
+        ['', ''],
+        ['RAZÓN DE LA CAÍDA', reporte.razon_caida],
+        ['', ''],
+        ['RIESGO PECES', '⚠ SÍ' if reporte.riesgo_peces else '✓ NO'],
+        ['PÉRDIDA ECONÓMICA', '⚠ SÍ' if reporte.perdida_economica else '✓ NO'],
+    ]
+    
+    if reporte.observacion:
+        data.append(['', ''])
+        data.append(['OBSERVACIONES', reporte.observacion])
+    
+    # Convertir textos largos a Paragraphs para que se ajusten automáticamente
+    normal_style = styles['Normal']
+    normal_style.fontSize = 10
+    normal_style.leading = 12
+    
+    # Procesar la data para convertir textos largos en Paragraphs
+    processed_data = []
+    for row in data:
+        if len(row) == 2 and row[0] and row[1]:  # Solo procesar filas con contenido
+            # Si el texto es largo, convertirlo a Paragraph
+            if isinstance(row[1], str) and len(row[1]) > 50:
+                processed_data.append([row[0], Paragraph(row[1], normal_style)])
+            else:
+                processed_data.append(row)
+        else:
+            processed_data.append(row)
+    
+    table = Table(processed_data, colWidths=[2.2*inch, 4.8*inch])
+    table.setStyle(TableStyle([
+        # Encabezados (columna izquierda)
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E8F4F8')),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#00457C')),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (0, -1), 10),
+        
+        # Valores (columna derecha)
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (1, 0), (1, -1), 10),
+        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#333333')),
+        
+        # Alineación
+        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        
+        # Padding
+        ('LEFTPADDING', (0, 0), (-1, -1), 12),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        
+        # Bordes suaves
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CCCCCC')),
+        ('LINEBELOW', (0, 0), (-1, -2), 0.5, colors.HexColor('#E0E0E0')),
+        
+        # Filas vacías (separadores)
+        ('BACKGROUND', (0, 2), (-1, 2), colors.white),
+        ('BACKGROUND', (0, 6), (-1, 6), colors.white),
+        ('BACKGROUND', (0, 8), (-1, 8), colors.white),
+        ('LINEBELOW', (0, 2), (-1, 2), 0, colors.white),
+        ('LINEBELOW', (0, 6), (-1, 6), 0, colors.white),
+        ('LINEBELOW', (0, 8), (-1, 8), 0, colors.white),
+    ]))
+    
+    elements.append(table)
+    elements.append(Spacer(1, 20))
+    
+    # Pie de página con fecha y hora completa en zona horaria de Chile
+    import pytz
+    chile_tz = pytz.timezone('America/Santiago')
+    fecha_generacion = timezone.now().astimezone(chile_tz)
+    
+    # Obtener el día de la semana en español
+    dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    dia_semana = dias_semana[fecha_generacion.weekday()]
+    
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=colors.HexColor('#999999'),
+        alignment=TA_CENTER
+    )
+    
+    fecha_texto = f"{dia_semana} {fecha_generacion.strftime('%d/%m/%Y')} - {fecha_generacion.strftime('%H:%M')} hrs"
+    elements.append(Paragraph(f"Generado: {fecha_texto} | Puerto Montt, Chile | CERMAQ", footer_style))
+    
+    # Construir el PDF
+    doc.build(elements)
+    
+    # Obtener el valor del buffer y escribirlo en la respuesta
+    pdf = buffer.getvalue()
+    buffer.close()
+    response.write(pdf)
+    
+    return response
+
+
+# ============================================================================
+# VISTAS PARA ESTADÍSTICAS DE PLATAFORMAS
+# ============================================================================
+
+def normalizar_razon_caida(razon):
+    """
+    Normaliza las razones de caída para agrupar descripciones similares.
+    Detecta patrones comunes y los estandariza.
+    """
+    if not razon:
+        return "Sin especificar"
+    
+    razon_lower = razon.lower().strip()
+    
+    # Diccionario de patrones ordenados por prioridad (más específicos primero)
+    patrones = {
+        # Sin respuesta del proveedor (DEBE IR PRIMERO para capturar correctamente)
+        'Sin respuesta del proveedor': [
+            'sin respuesta de sinplant', 'sin respuesta de innovex', 'sin respuesta de ideal control',
+            'sin respuesta de idealcontrol', 'sin respuesta del proveedor', 'proveedor sin responder', 
+            'proveedor no responde', 'sin respuesta por parte de', 'no hay respuesta de', 
+            'falta respuesta de', 'se contactó con innovex y la rediseñ', 'se contacto con innovex',
+            'no se tuvo información clara', 'no se tuvo informacion clara',
+            'se contactó y no hubo respuesta de idealcontrol', 'se contacto y no hubo respuesta de idealcontrol',
+            'no hubo respuesta de idealcontrol', 'no hubo respuesta de ideal control',
+            'página caída sin respuesta inmediata', 'pagina caida sin respuesta inmediata',
+            'sin respuesta inmediata luego del correo', 'sin respuesta inmediata',
+            'datos sin actualizar', 'sin actualización de datos', 'sin actualizacion de datos',
+            'datos no se actualizan', 'datos congelados', 'datos estáticos', 'datos estaticos',
+            'sin carga de datos', 'datos no cargan', 'no carga datos en tiempo real',
+            'sin carga en tiempo real', 'no carga en tiempo real'
+        ],
+        
+        # Plataforma caída - Sin visualización de datos
+        'Plataforma caída - Sin visualización de datos': [
+            'plataforma caída', 'plataforma caida', 'caída de plataforma',
+            'caida de plataforma', 'sin visualización de datos', 'sin visualizacion de datos',
+            'plataforma sin funcionar', 'plataforma no funciona',
+            'plataforma fuera de servicio', 'plataforma down', 'plataforma inaccesible'
+        ],
+        
+        # Sistema congelado - Interfaz no responde
+        'Sistema congelado - Interfaz no responde': [
+            'sistema congelado', 'interfaz congelada', 'pantalla congelada',
+            'sistema no responde', 'interfaz no responde', 'sistema bloqueado',
+            'interfaz bloqueada', 'sistema trabado', 'interfaz trabada',
+            'se reinició y no hubo respuesta del servidor', 'se reinicio y no hubo respuesta'
+        ],
+        
+        # Pérdida de conectividad
+        'Pérdida de conectividad': [
+            'sin conectividad', 'pérdida de conectividad', 'perdida de conectividad',
+            'falta de conectividad', 'problemas de conectividad',
+            'falla de conectividad', 'conectividad perdida',
+            'falla de conexión', 'falla de conexion', 'sin conexión', 'sin conexion',
+            'pérdida de conexión', 'perdida de conexion', 'conexión perdida',
+            'falla en la conexión', 'problemas de conexión', 'problemas de conexion',
+            'sin señal', 'pérdida de señal', 'perdida de señal'
+        ],
+        
+        # Cambio de servidor / Interferencia técnica
+        'Cambio de servidor / Interferencia técnica': [
+            'innovex en proceso de cambio de servidor', 'cambio de servidor',
+            'proceso de cambio', 'interferencia', 'interferencia técnica',
+            'interferencia tecnica'
+        ],
+        
+        # Actualización / Modificación del sistema
+        'Actualización / Modificación del sistema': [
+            'se estuvieron realizando modificaciones en la bds', 
+            'realizando modificaciones', 'modificaciones en',
+            'actualización del sistema', 'actualizacion del sistema',
+            'modificación del sistema', 'modificacion del sistema'
+        ],
+        
+        # Mantenimiento programado
+        'Mantenimiento programado': [
+            'mantenimiento programado', 'mantenimiento preventivo', 'mantenimiento planificado',
+            'en mantenimiento', 'mantenimiento de sistema', 'actualización programada',
+            'actualizacion programada'
+        ],
+        
+        # Falla eléctrica
+        'Falla eléctrica': [
+            'falla eléctrica', 'falla electrica', 'corte de luz', 'corte eléctrico',
+            'corte electrico', 'problema eléctrico', 'problema electrico',
+            'sin energía', 'sin energia', 'falta de energía', 'falta de energia'
+        ],
+        
+        # Sobrecarga del sistema
+        'Sobrecarga del sistema': [
+            'sobrecarga', 'sistema sobrecargado', 'alto tráfico', 'mucho tráfico',
+            'alto trafico', 'mucho trafico',
+            'exceso de carga', 'saturación del sistema', 'saturacion del sistema'
+        ],
+        
+        # Error de software
+        'Error de software': [
+            'error de software', 'bug', 'error en el sistema', 'fallo de software',
+            'error de aplicación', 'error de aplicacion', 'error del programa'
+        ]
+    }
+    
+    # Buscar coincidencias en los patrones (orden importa)
+    for categoria, keywords in patrones.items():
+        for keyword in keywords:
+            if keyword in razon_lower:
+                return categoria
+    
+    # Si no coincide con ningún patrón, devolver la razón original capitalizada
+    return razon.strip().capitalize()
+
+
+@login_required
+def vista_estadisticas_plataformas(request):
+    """Vista principal para mostrar estadísticas de fallas de plataforma"""
+    centros = Centro.objects.all().order_by('nombre')
+    
+    context = {
+        'centros': centros,
+    }
+    
+    return render(request, 'estadisticas_plataformas.html', context)
+
+
+@login_required
+def api_estadisticas_plataformas(request):
+    """API para obtener datos estadísticos de fallas de plataforma"""
+    try:
+        # Obtener filtros opcionales
+        fecha_inicio = request.GET.get('fecha_inicio', '')
+        fecha_fin = request.GET.get('fecha_fin', '')
+        plataforma_filtro = request.GET.get('plataforma', '')
+        centro_filtro = request.GET.get('centro', '')
+        
+        # Query base
+        reportes = ReportePlataforma.objects.select_related('centro').all()
+        
+        # Aplicar filtros
+        if fecha_inicio:
+            reportes = reportes.filter(fecha_hora__date__gte=fecha_inicio)
+        if fecha_fin:
+            reportes = reportes.filter(fecha_hora__date__lte=fecha_fin)
+        if plataforma_filtro:
+            reportes = reportes.filter(plataforma=plataforma_filtro)
+        if centro_filtro:
+            reportes = reportes.filter(centro_id=centro_filtro)
+        
+        # Estadísticas por tipo de falla
+        fallas_por_tipo = {}
+        for reporte in reportes:
+            tipo = reporte.sistema_fallando
+            if tipo not in fallas_por_tipo:
+                fallas_por_tipo[tipo] = 0
+            fallas_por_tipo[tipo] += 1
+        
+        # Estadísticas por plataforma
+        fallas_por_plataforma = {}
+        for reporte in reportes:
+            plataforma = reporte.plataforma
+            if plataforma not in fallas_por_plataforma:
+                fallas_por_plataforma[plataforma] = 0
+            fallas_por_plataforma[plataforma] += 1
+        
+        # Estadísticas por centro
+        fallas_por_centro = {}
+        for reporte in reportes:
+            centro = reporte.centro.nombre
+            if centro not in fallas_por_centro:
+                fallas_por_centro[centro] = 0
+            fallas_por_centro[centro] += 1
+        
+        # Tipos de falla por plataforma
+        fallas_tipo_plataforma = {}
+        for reporte in reportes:
+            plataforma = reporte.plataforma
+            tipo = reporte.sistema_fallando
+            
+            if plataforma not in fallas_tipo_plataforma:
+                fallas_tipo_plataforma[plataforma] = {}
+            
+            if tipo not in fallas_tipo_plataforma[plataforma]:
+                fallas_tipo_plataforma[plataforma][tipo] = 0
+            
+            fallas_tipo_plataforma[plataforma][tipo] += 1
+        
+        # Tiempo promedio fuera de servicio por tipo de falla (convertir todo a minutos)
+        tiempo_por_tipo = {}
+        for reporte in reportes:
+            tipo = reporte.sistema_fallando
+            # Convertir a minutos si está en días
+            tiempo_minutos = reporte.tiempo_fuera_servicio
+            if reporte.unidad_tiempo == 'dias':
+                tiempo_minutos = reporte.tiempo_fuera_servicio * 1440  # 1 día = 1440 minutos
+            
+            if tipo not in tiempo_por_tipo:
+                tiempo_por_tipo[tipo] = {'total': 0, 'count': 0}
+            
+            tiempo_por_tipo[tipo]['total'] += tiempo_minutos
+            tiempo_por_tipo[tipo]['count'] += 1
+        
+        # Calcular promedios
+        tiempo_promedio_por_tipo = {}
+        for tipo, datos in tiempo_por_tipo.items():
+            tiempo_promedio_por_tipo[tipo] = round(datos['total'] / datos['count'], 2)
+        
+        # Observaciones más comunes (normalizadas) con detalles de incidencias
+        observaciones_comunes = {}
+        detalles_por_razon = {}
+        
+        for reporte in reportes:
+            # Si tiene razón de caída, normalizarla; si no, clasificar como 'Sin razón especificada'
+            if reporte.razon_caida:
+                razon_normalizada = normalizar_razon_caida(reporte.razon_caida)
+            else:
+                razon_normalizada = 'Sin razón especificada'
+            
+            # Contar ocurrencias
+            if razon_normalizada not in observaciones_comunes:
+                observaciones_comunes[razon_normalizada] = 0
+                detalles_por_razon[razon_normalizada] = []
+            
+            observaciones_comunes[razon_normalizada] += 1
+            
+            # Guardar detalles de la incidencia
+            chile_tz = pytz.timezone('America/Santiago')
+            fecha_hora_chile = reporte.fecha_hora.astimezone(chile_tz) if timezone.is_aware(reporte.fecha_hora) else chile_tz.localize(reporte.fecha_hora)
+            
+            detalles_por_razon[razon_normalizada].append({
+                'id': reporte.id,
+                'fecha_hora': fecha_hora_chile.strftime('%d/%m/%Y %H:%M'),
+                'centro': reporte.centro.nombre,
+                'plataforma': reporte.plataforma,
+                'sistema_fallando': reporte.sistema_fallando,
+                'tiempo_fuera': f"{reporte.tiempo_fuera_servicio} {'días' if reporte.unidad_tiempo == 'dias' else 'min'}",
+                'responsable': reporte.responsable,
+                'razon_original': reporte.razon_caida if reporte.razon_caida else 'Sin razón',
+                'observacion': reporte.observacion
+            })
+        
+        # Ordenar observaciones por frecuencia
+        observaciones_ordenadas = sorted(
+            observaciones_comunes.items(), 
+            key=lambda x: x[1], 
+            reverse=True
+        )[:10]  # Top 10
+        
+        return JsonResponse({
+            'success': True,
+            'total_reportes': reportes.count(),
+            'fallas_por_tipo': fallas_por_tipo,
+            'fallas_por_plataforma': fallas_por_plataforma,
+            'fallas_por_centro': fallas_por_centro,
+            'fallas_tipo_plataforma': fallas_tipo_plataforma,
+            'tiempo_promedio_por_tipo': tiempo_promedio_por_tipo,
+            'observaciones_comunes': dict(observaciones_ordenadas),
+            'detalles_por_razon': detalles_por_razon
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)

@@ -3,10 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Dashboard Profesional - Incidencias PCC</title>
     {% load static %}
     {% load humanize %}
-    <link rel="stylesheet" href="{% static 'css/dashboard_profesional.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard_profesional.css' %}?v=20260130-2008">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8"></script>
@@ -570,15 +573,42 @@
             }
         });
 
+        // Mapeo fijo de colores por tipo de incidencia
+        const coloresTipos = {
+            'Estanque en Tratamiento': '#3498db',      // Azul
+            'Estanque en Manejo': '#2ecc71',           // Verde
+            'Estanque en manejo': '#2ecc71',           // Verde (variante)
+            'Estanque con traslado de peces': '#e74c3c', // Rojo
+            'Estanque en Vacunación': '#9b59b6',       // Morado
+            'Desdoble de estanque': '#1abc9c',         // Turquesa
+            'Estanque en flashing': '#34495e',         // Gris oscuro
+            'Manipulando sensor': '#f39c12',           // Naranja
+            'Sin clasificar': '#95a5a6'                // Gris claro
+        };
+
         // Gráfico de Dona
         const ctxDona = document.getElementById('chartDona').getContext('2d');
+
+        const tiposLabels = {{ tipos_labels|safe }};
+        const tiposData = {{ tipos_data|safe }};
+        
+        // Debug
+        console.log('Tipos Labels:', tiposLabels);
+        console.log('Tipos Data:', tiposData);
+        console.log('Total tipos:', tiposLabels.length);
+
+        // Asignar colores según tipo
+        const tiposColores = tiposLabels.map(tipo => 
+            coloresTipos[tipo] || '#95a5a6'  // Color por defecto si no está en el mapeo
+        );
+
         const chartDona = new Chart(ctxDona, {
             type: 'doughnut',
             data: {
-                labels: {{ tipos_labels|safe }},
+                labels: tiposLabels,
                 datasets: [{
-                    data: {{ tipos_data|safe }},
-                    backgroundColor: ['#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6', '#1abc9c', '#34495e', '#95a5a6']
+                    data: tiposData,
+                    backgroundColor: tiposColores
                 }]
             },
             options: {
@@ -641,15 +671,41 @@
             }
         });
 
+        // Mapeo fijo de colores por turno
+        const coloresTurnos = {
+            'Día': '#3498db',       // Azul
+            'Mañana': '#3498db',    // Azul (alias)
+            'Tarde': '#e74c3c',     // Rojo
+            'Noche': '#f39c12',     // Naranja
+            'Sin turno': '#95a5a6'  // Gris
+        };
+
         // Gráfico de Turnos
         const ctxTurnos = document.getElementById('chartTurnos').getContext('2d');
+
+        // Datos de turnos desde el backend
+        const turnosLabels = {{ turnos_labels|safe }};
+        const turnosData = {{ turnos_data|safe }};
+        
+        // Debug
+        console.log('Turnos Labels:', turnosLabels);
+        console.log('Turnos Data:', turnosData);
+
+        // Asignar colores según el turno
+        const turnosColores = turnosLabels.map(turno => {
+            if (turno === 'Día' || turno === 'Mañana') return '#3498db';
+            if (turno === 'Tarde') return '#e74c3c';
+            if (turno === 'Noche') return '#f39c12';
+            return '#95a5a6';
+        });
+
         const chartTurnos = new Chart(ctxTurnos, {
             type: 'pie',
             data: {
-                labels: {{ turnos_labels|safe }},
+                labels: turnosLabels,
                 datasets: [{
-                    data: {{ turnos_data|safe }},
-                    backgroundColor: ['#3498db', '#e74c3c', '#f39c12', '#2ecc71']
+                    data: turnosData,
+                    backgroundColor: turnosColores
                 }]
             },
             options: {
@@ -993,13 +1049,19 @@
                 tiposCount[tipo] = (tiposCount[tipo] || 0) + 1;
             });
             
-            // Ordenar por cantidad y tomar top 8
-            let tiposArray = Object.entries(tiposCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
+            // Ordenar por cantidad - MOSTRAR TODOS LOS TIPOS
+            let tiposArray = Object.entries(tiposCount).sort((a, b) => b[1] - a[1]);
             let tiposLabels = tiposArray.map(t => t[0]);
             let tiposData = tiposArray.map(t => t[1]);
             
+            // Asignar colores consistentes según tipo
+            let tiposColoresActualizados = tiposLabels.map(tipo => 
+                coloresTipos[tipo] || '#95a5a6'
+            );
+            
             chartDona.data.labels = tiposLabels;
             chartDona.data.datasets[0].data = tiposData;
+            chartDona.data.datasets[0].backgroundColor = tiposColoresActualizados;
             chartDona.update();
             
             // Datos para gráfico de tendencia temporal
@@ -1033,11 +1095,27 @@
                 }
             });
             
-            let turnosLabels = Object.keys(turnosCount);
-            let turnosData = Object.values(turnosCount);
+            // Ordenar turnos de forma consistente - RECONOCER DÍA Y MAÑANA
+            const turnosOrden = ['Día', 'Mañana', 'Tarde', 'Noche', 'Sin turno'];
+            let turnosLabels = [];
+            let turnosData = [];
+            let turnosColores = [];
+
+            turnosOrden.forEach(turno => {
+                if (turnosCount[turno] && turnosCount[turno] > 0) {
+                    turnosLabels.push(turno);
+                    turnosData.push(turnosCount[turno]);
+                    // Usar el color correcto para Día/Mañana
+                    const color = (turno === 'Día' || turno === 'Mañana') ? '#3498db' : 
+                                  (turno === 'Tarde') ? '#e74c3c' : 
+                                  (turno === 'Noche') ? '#f39c12' : '#95a5a6';
+                    turnosColores.push(color);
+                }
+            });
             
             chartTurnos.data.labels = turnosLabels;
             chartTurnos.data.datasets[0].data = turnosData;
+            chartTurnos.data.datasets[0].backgroundColor = turnosColores;
             chartTurnos.update();
         }
 
@@ -1130,4 +1208,5 @@
         }
     </style>
 </body>
+<!-- Version: 2026-01-30-2012 - CORREGIDO: actualizarGraficos ahora reconoce turno Día, meta tags no-cache -->
 </html>
